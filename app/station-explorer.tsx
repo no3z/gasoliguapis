@@ -647,6 +647,7 @@ export default function StationExplorer({
             onSelect={setSelectedStationId}
             onOpenList={openStationInList}
             onDirections={openDirections}
+            onRequestLocation={useMyLocation}
           />
           <div className="map-glass-search">
             <div className="route-card">

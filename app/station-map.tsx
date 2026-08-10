@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Layers3, LocateFixed, MapPin, Navigation, Star } from "lucide-react";
+import { Layers3, LocateFixed, Map, MapPin, Navigation, Star } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Map as MapLibreMap, Marker as MapLibreMarker } from "maplibre-gl";
 
@@ -36,6 +36,7 @@ type Props = {
   onSelect: (stationId: string) => void;
   onOpenList: (stationId: string) => void;
   onDirections: (stationId: string) => void;
+  onRequestLocation: () => void;
 };
 
 const SPAIN_BOUNDS: [[number, number], [number, number]] = [[-9.7, 35.7], [4.5, 43.9]];
@@ -44,7 +45,7 @@ function formatPrice(micros: number) {
   return `${(micros / 1_000_000).toLocaleString("es-ES", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} €`;
 }
 
-export default function StationMap({ stations, selectedId, userLocation, loading, fuelLabel, onSelect, onOpenList, onDirections }: Props) {
+export default function StationMap({ stations, selectedId, userLocation, loading, fuelLabel, onSelect, onOpenList, onDirections, onRequestLocation }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markersRef = useRef<MapLibreMarker[]>([]);
@@ -53,6 +54,7 @@ export default function StationMap({ stations, selectedId, userLocation, loading
   const [ready, setReady] = useState(false);
   const [mapError, setMapError] = useState(false);
   const [perspective, setPerspective] = useState(true);
+  const [mapAttempt, setMapAttempt] = useState(0);
 
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
   const selectedStation = useMemo(
@@ -63,6 +65,7 @@ export default function StationMap({ stations, selectedId, userLocation, loading
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     let cancelled = false;
+    let loadTimer: ReturnType<typeof setTimeout> | null = null;
     import("maplibre-gl").then((maplibre) => {
       if (cancelled || !containerRef.current) return;
       const map = new maplibre.Map({
@@ -75,19 +78,25 @@ export default function StationMap({ stations, selectedId, userLocation, loading
         minZoom: 3,
         maxZoom: 17,
       });
-      map.addControl(new maplibre.NavigationControl({ showCompass: true, visualizePitch: true }), "top-right");
-      map.on("load", () => { setMapError(false); setReady(true); });
-      map.on("error", () => { if (!map.isStyleLoaded()) setMapError(true); });
       mapRef.current = map;
+      loadTimer = setTimeout(() => {
+        if (!cancelled && !map.loaded()) setMapError(true);
+      }, 15_000);
+      map.on("load", () => {
+        if (loadTimer) clearTimeout(loadTimer);
+        setMapError(false);
+        setReady(true);
+      });
     }).catch(() => setMapError(true));
     return () => {
       cancelled = true;
+      if (loadTimer) clearTimeout(loadTimer);
       markersRef.current.forEach((marker) => marker.remove());
       userMarkerRef.current?.remove();
       mapRef.current?.remove();
       mapRef.current = null;
     };
-  }, []);
+  }, [mapAttempt]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -166,10 +175,15 @@ export default function StationMap({ stations, selectedId, userLocation, loading
     else map.fitBounds(SPAIN_BOUNDS, { padding: 22, duration: 600 });
   };
 
-  const togglePerspective = () => {
-    const nextPerspective = !perspective;
-    setPerspective(nextPerspective);
-    mapRef.current?.easeTo({ pitch: nextPerspective ? 42 : 0, bearing: nextPerspective ? -8 : 0, duration: 550 });
+  const setPerspectiveMode = (enabled: boolean) => {
+    setPerspective(enabled);
+    mapRef.current?.easeTo({ pitch: enabled ? 42 : 0, bearing: enabled ? -8 : 0, duration: 550 });
+  };
+
+  const retryMap = () => {
+    setReady(false);
+    setMapError(false);
+    setMapAttempt((attempt) => attempt + 1);
   };
 
   const serviceValue = (status?: string | null, rating?: number | null, count?: number) => {
@@ -183,10 +197,17 @@ export default function StationMap({ stations, selectedId, userLocation, loading
     <section className="map-explorer" id="mapa" aria-label="Mapa de gasolineras filtradas">
       <div ref={containerRef} className="stations-map" />
       {!ready && !mapError ? <div className="map-loading"><span /><strong>Cargando mapa…</strong></div> : null}
-      {mapError ? <div className="map-loading error"><MapPin size={24} /><strong>No se pudo cargar el mapa</strong><span>La lista sigue disponible más abajo.</span></div> : null}
-      <div className={`map-result-count ${selectedStation ? "with-selection" : ""}`}><MapPin size={14} /><strong>{stations.length}</strong> en el mapa{loading ? " · actualizando…" : ""}</div>
-      <button className="map-recenter" onClick={recenter} aria-label={userLocation ? "Centrar mapa en mi ubicación" : "Mostrar toda España"}><LocateFixed size={19} /></button>
-      <button className={`map-perspective ${perspective ? "active" : ""}`} onClick={togglePerspective} aria-pressed={perspective}>{perspective ? <Layers3 size={17} /> : <Box size={17} />}{perspective ? "3D" : "2D"}</button>
+      {mapError ? <div className="map-loading error"><MapPin size={24} /><strong>No se pudo cargar el mapa</strong><span>La lista sigue disponible más abajo.</span><button onClick={retryMap}>Reintentar</button></div> : null}
+      <div className={`map-toolbar ${selectedStation ? "with-selection" : ""}`}>
+        <div className="map-toolbar-count"><MapPin size={14} /><strong>{stations.length}</strong><span>en el mapa{loading ? " · actualizando…" : ""}</span></div>
+        <button className="map-location-action" onClick={userLocation ? recenter : onRequestLocation}>
+          <LocateFixed size={16} /><span>{userLocation ? "Mi posición" : "Usar ubicación"}</span>
+        </button>
+        <div className="map-mode-switch" aria-label="Perspectiva del mapa">
+          <button className={!perspective ? "active" : ""} onClick={() => setPerspectiveMode(false)} aria-pressed={!perspective}><Map size={14} />2D</button>
+          <button className={perspective ? "active" : ""} onClick={() => setPerspectiveMode(true)} aria-pressed={perspective}><Layers3 size={14} />3D</button>
+        </div>
+      </div>
       {selectedStation ? (
         <div className="map-selection">
           <button className="map-selection-main" onClick={() => onOpenList(selectedStation.id)}>

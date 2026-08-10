@@ -118,7 +118,10 @@ test("connects the filtered station list to an interactive map", async () => {
   assert.match(packageJson, /maplibre-gl/);
   assert.match(map, /tiles\.openfreemap\.org\/styles\/liberty/);
   assert.match(map, /flyTo/);
-  assert.match(map, /togglePerspective/);
+  assert.match(map, /setPerspectiveMode/);
+  assert.match(map, /map-toolbar/);
+  assert.match(map, /onRequestLocation/);
+  assert.doesNotMatch(map, /map\.on\("error"/);
   assert.match(explorer, /Ver en mapa/);
   assert.match(explorer, /Google Maps/);
   assert.match(explorer, /Apple Maps/);
