@@ -23,15 +23,18 @@ test("server-renders the Gasoliguapis product", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>Gasolineras en carretera: precios, GLP, AdBlue y servicios \| Gasoliguapis<\/title>/i);
-  assert.match(html, /Gasolineras en ruta/);
+  assert.match(html, /Encuentra tu/);
   assert.match(html, /CATÁLOGO OFICIAL · MITECO/);
-  assert.match(html, /Café rico, baños limpios/);
+  assert.match(html, /Filtra el mapa por combustible/);
   assert.match(html, /Tu combustible/);
   assert.match(html, /Tiene GLP/);
   assert.match(html, /Tiene AdBlue/);
   assert.match(html, /Toda España/);
   assert.match(html, /Cerca de mí/);
   assert.match(html, /Más baratas/);
+  assert.match(html, /Mejor puntuadas/);
+  assert.match(html, /RESULTADOS EN EL MAPA/);
+  assert.match(html, /Cafetería/);
   assert.match(html, /calculadora-ahorro-combustible/);
   assert.doesNotMatch(html, /FICHA DE EJEMPLO|opiniones demo|Precios de muestra/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);
@@ -103,4 +106,20 @@ test("ships temporary community confirmations without persisting location", asyn
   assert.match(confirmationApi, /proximityVerified/);
   assert.doesNotMatch(schema, /latitude|longitude|accuracy/i);
   assert.match(migration, /station_confirmation_summaries/);
+});
+
+test("connects the filtered station list to an interactive map", async () => {
+  const [map, explorer, stationsApi, packageJson] = await Promise.all([
+    readFile(new URL("../app/station-map.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/station-explorer.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/stations/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../package.json", import.meta.url), "utf8"),
+  ]);
+  assert.match(packageJson, /maplibre-gl/);
+  assert.match(map, /tiles\.openfreemap\.org\/styles\/positron/);
+  assert.match(map, /flyTo/);
+  assert.match(explorer, /Ver en mapa/);
+  assert.match(explorer, /serviceFilters/);
+  assert.match(stationsApi, /sortParam === "rating"/);
+  assert.match(stationsApi, /restaurant_check\.latest_status/);
 });

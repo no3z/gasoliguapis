@@ -53,15 +53,17 @@ export async function GET(request: Request) {
   const province = url.searchParams.get("province")?.trim();
   const fuel = url.searchParams.get("fuel")?.trim() || "diesel_a";
   const query = url.searchParams.get("q")?.trim().slice(0, 80) || "";
-  const requestedSort = url.searchParams.get("sort") === "distance" ? "distance" : "price";
+  const sortParam = url.searchParams.get("sort");
+  const requestedSort = sortParam === "distance" ? "distance" : sortParam === "rating" ? "rating" : "price";
   const latitude = Number(url.searchParams.get("lat"));
   const longitude = Number(url.searchParams.get("lng"));
   const hasLocation = Number.isFinite(latitude) && latitude >= 35 && latitude <= 44.5
     && Number.isFinite(longitude) && longitude >= -10 && longitude <= 5;
   const requestedRadius = Number(url.searchParams.get("radiusKm") || 75);
   const radiusKm = Number.isFinite(requestedRadius) ? Math.min(250, Math.max(5, requestedRadius)) : 75;
-  const sort = requestedSort === "distance" && hasLocation ? "distance" : "price";
+  const sort = requestedSort === "distance" && !hasLocation ? "price" : requestedSort;
   const required = url.searchParams.getAll("requires").filter((item) => item === "lpg" || item === "adblue");
+  const services = url.searchParams.getAll("service").filter((item) => item === "bathroom" || item === "coffee" || item === "restaurant" || item === "rated");
   const requestedLimit = Number(url.searchParams.get("limit") || 30);
   const limit = Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, Math.floor(requestedLimit))) : 30;
   if (!ALLOWED_FUELS.has(fuel)) {
@@ -69,6 +71,10 @@ export async function GET(request: Request) {
   }
   const requiresLpg = required.includes("lpg") ? 1 : 0;
   const requiresAdblue = required.includes("adblue") ? 1 : 0;
+  const requiresBathroom = services.includes("bathroom") ? 1 : 0;
+  const requiresCoffee = services.includes("coffee") ? 1 : 0;
+  const requiresRestaurant = services.includes("restaurant") ? 1 : 0;
+  const requiresRating = services.includes("rated") ? 1 : 0;
   const communityFuelCategory = fuel === "lpg" ? "lpg_status" : fuel === "adblue" ? "adblue_status" : "none";
   const queryLike = query ? `%${query.toLocaleLowerCase("es")}%` : null;
   const latDelta = hasLocation ? radiusKm / 111 : 0;
@@ -78,13 +84,18 @@ export async function GET(request: Request) {
   const locationClause = hasLocation ? "AND s.lat_e6 BETWEEN ? AND ? AND s.lng_e6 BETWEEN ? AND ?" : "";
   const orderClause = sort === "distance"
     ? "ORDER BY ABS(s.lat_e6 - ?) + ABS(s.lng_e6 - ?) ASC, p.price_micros ASC"
-    : "ORDER BY p.price_micros ASC, s.name ASC";
+    : sort === "rating"
+      ? "ORDER BY (SELECT COALESCE(AVG(sr.value), 0) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'overall') DESC, (SELECT COUNT(*) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'overall') DESC, p.price_micros ASC"
+      : "ORDER BY p.price_micros ASC, s.name ASC";
 
   let data: Array<Record<string, unknown>> = [];
   let total = 0;
   let databaseInitialized = false;
   try {
-    const values: unknown[] = [fuel, province || null, province || null, queryLike, queryLike, requiresLpg, requiresAdblue];
+    const values: unknown[] = [
+      fuel, province || null, province || null, queryLike, queryLike, requiresLpg, requiresAdblue,
+      requiresBathroom, requiresCoffee, requiresRestaurant, requiresRating,
+    ];
     if (hasLocation) values.push(
       Math.round((latitude - latDelta) * 1_000_000),
       Math.round((latitude + latDelta) * 1_000_000),
@@ -99,6 +110,8 @@ export async function GET(request: Request) {
       p.price_micros AS priceMicros, p.currency, COALESCE(ds.updated_at, p.observed_at) AS priceObservedAt,
       lpg.price_micros AS lpgPriceMicros, COALESCE(ds.updated_at, lpg.observed_at) AS lpgObservedAt,
       adblue.price_micros AS adbluePriceMicros, COALESCE(ds.updated_at, adblue.observed_at) AS adblueObservedAt,
+      (SELECT ROUND(AVG(sr.value), 1) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'overall') AS overallRating,
+      (SELECT COUNT(*) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'overall') AS overallCount,
       (SELECT ROUND(AVG(sr.value), 1) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'bathroom') AS bathroomRating,
       (SELECT COUNT(*) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'bathroom') AS bathroomCount,
       (SELECT ROUND(AVG(sr.value), 1) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'coffee') AS coffeeRating,
@@ -130,6 +143,10 @@ export async function GET(request: Request) {
       AND (? IS NULL OR lower(coalesce(s.name, '') || ' ' || coalesce(s.brand, '') || ' ' || coalesce(s.address, '') || ' ' || coalesce(s.municipality, '') || ' ' || coalesce(s.province, '')) LIKE ?)
       AND (? = 0 OR lpg.station_id IS NOT NULL)
       AND (? = 0 OR adblue.station_id IS NOT NULL)
+      AND (? = 0 OR bathroom_check.latest_status = 'clean' OR EXISTS (SELECT 1 FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'bathroom'))
+      AND (? = 0 OR coffee_check.latest_status = 'good' OR EXISTS (SELECT 1 FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'coffee'))
+      AND (? = 0 OR restaurant_check.latest_status = 'good')
+      AND (? = 0 OR EXISTS (SELECT 1 FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'overall'))
       ${locationClause}
     ${orderClause}
     LIMIT ?`).bind(...values).all<Record<string, unknown>>();
@@ -179,6 +196,7 @@ export async function GET(request: Request) {
           .filter(Boolean).join(" ").toLocaleLowerCase("es").includes(query.toLocaleLowerCase("es")))
         .filter((station) => !requiresLpg || lpgByStation.has(station.IDEESS))
         .filter((station) => !requiresAdblue || adblueByStation.has(station.IDEESS))
+        .filter(() => services.length === 0)
         .map((station) => {
           const selectedPrice = decimal(station.PrecioProducto) as number;
           const lpgPrice = lpgByStation.get(station.IDEESS) ?? null;
@@ -201,6 +219,8 @@ export async function GET(request: Request) {
             lpgObservedAt: lpgPrice === null ? null : lpgObservedAt,
             adbluePriceMicros: adbluePrice === null ? null : Math.round(adbluePrice * 1_000_000),
             adblueObservedAt: adbluePrice === null ? null : adblueObservedAt,
+            overallRating: null,
+            overallCount: 0,
             bathroomRating: null,
             bathroomCount: 0,
             coffeeRating: null,
@@ -224,7 +244,9 @@ export async function GET(request: Request) {
         .filter((station) => !hasLocation || Number(station.distanceKm) <= radiusKm)
         .sort((a, b) => sort === "distance"
           ? Number(a.distanceKm) - Number(b.distanceKm)
-          : a.priceMicros - b.priceMicros);
+          : sort === "rating"
+            ? Number(b.overallRating ?? 0) - Number(a.overallRating ?? 0) || a.priceMicros - b.priceMicros
+            : a.priceMicros - b.priceMicros);
       total = matches.length;
       data = matches.slice(0, limit);
       delivery = "live-fallback";

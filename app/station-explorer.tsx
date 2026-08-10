@@ -22,15 +22,16 @@ import {
   UtensilsCrossed,
   UserRound,
   X,
-  Zap,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import StationMap from "./station-map";
 
 type FuelCode = "diesel_a" | "gasoline_95_e5" | "lpg" | "adblue";
 type ProductCode = "lpg" | "adblue";
-type SortMode = "price" | "distance";
+type SortMode = "price" | "distance" | "rating";
 type RatingDimension = "overall" | "bathroom" | "coffee" | "cleanliness";
+type ServiceFilter = "bathroom" | "coffee" | "restaurant" | "rated";
 type ConfirmationCategory = "lpg_status" | "adblue_status" | "bathroom" | "coffee" | "restaurant" | "cleanliness";
 type ConfirmationStatus = "working" | "no_product" | "broken" | "closed" | "clean" | "dirty" | "good" | "poor";
 
@@ -51,6 +52,8 @@ type OfficialStation = {
   adbluePriceMicros: number | null;
   adblueObservedAt: number | null;
   distanceKm?: number | null;
+  overallRating?: number | null;
+  overallCount?: number;
   bathroomRating?: number | null;
   bathroomCount?: number;
   coffeeRating?: number | null;
@@ -184,6 +187,7 @@ export default function StationExplorer({
   const [sort, setSort] = useState<SortMode>("price");
   const [fuel, setFuel] = useState<FuelCode>(initialFuel);
   const [requiredProducts, setRequiredProducts] = useState<ProductCode[]>([]);
+  const [serviceFilters, setServiceFilters] = useState<ServiceFilter[]>([]);
   const [favorites, setFavorites] = useState<Array<number | string>>([]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -201,13 +205,15 @@ export default function StationExplorer({
   const [confirmationCategory, setConfirmationCategory] = useState<ConfirmationCategory>("bathroom");
   const [confirmationSaving, setConfirmationSaving] = useState(false);
   const [clockNow] = useState(Date.now);
+  const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
   const [showCount, setShowCount] = useState(20);
 
   const selectedFuel = fuelOptions.find((item) => item.code === fuel) ?? fuelOptions[0];
   const provinceLabel = displayProvince(province);
   const requiredProductsKey = [...requiredProducts].sort().join(",");
+  const serviceFiltersKey = [...serviceFilters].sort().join(",");
   const locationKey = location ? `${location.latitude.toFixed(2)},${location.longitude.toFixed(2)}` : "national";
-  const officialRequestKey = `${fuel}|${province}|${requiredProductsKey}|${searchTerm}|${locationKey}|${sort}`;
+  const officialRequestKey = `${fuel}|${province}|${requiredProductsKey}|${serviceFiltersKey}|${searchTerm}|${locationKey}|${sort}`;
   const officialLoading = officialState.key !== officialRequestKey;
   const officialStations = useMemo(
     () => officialLoading ? [] : officialState.stations,
@@ -232,6 +238,7 @@ export default function StationExplorer({
       params.set("radiusKm", "75");
     }
     requiredProductsKey.split(",").filter(Boolean).forEach((product) => params.append("requires", product));
+    serviceFiltersKey.split(",").filter(Boolean).forEach((service) => params.append("service", service));
     fetch(`/api/stations?${params.toString()}`, { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error("official-data");
@@ -277,6 +284,7 @@ export default function StationExplorer({
                   adbluePriceMicros: adblueStation?.priceMicros ?? null,
                   adblueObservedAt: adblueStation ? adblueObservedAt : null,
                   distanceKm: calculatedDistance,
+                  overallRating: null, overallCount: 0,
                   bathroomRating: null, bathroomCount: 0,
                   coffeeRating: null, coffeeCount: 0,
                   cleanlinessRating: null, cleanlinessCount: 0,
@@ -287,10 +295,13 @@ export default function StationExplorer({
                   cleanlinessStatus: null, cleanlinessStatusAt: null,
                 };
               })
+              .filter(() => serviceFiltersKey.length === 0)
               .filter((station) => !location || Number(station.distanceKm) <= 75)
               .sort((left, right) => sort === "distance"
                 ? Number(left.distanceKm) - Number(right.distanceKm)
-                : left.priceMicros - right.priceMicros);
+                : sort === "rating"
+                  ? Number(right.overallRating ?? 0) - Number(left.overallRating ?? 0) || left.priceMicros - right.priceMicros
+                  : left.priceMicros - right.priceMicros);
             setOfficialState({ key: officialRequestKey, stations: matches.slice(0, 100), total: matches.length, error: "" });
             return;
           } catch (snapshotError: unknown) {
@@ -305,7 +316,7 @@ export default function StationExplorer({
         });
       });
     return () => controller.abort();
-  }, [fuel, location, officialRequestKey, province, requiredProductsKey, searchTerm, sort]);
+  }, [fuel, location, officialRequestKey, province, requiredProductsKey, searchTerm, serviceFiltersKey, sort]);
 
   const visibleOfficialStations = useMemo(() => officialStations.slice(0, showCount), [officialStations, showCount]);
   const recommendedStationId = useMemo(() => {
@@ -331,6 +342,18 @@ export default function StationExplorer({
     ? officialStations.find((station) => station.id === recommendedStationId) ?? null
     : null;
 
+  const focusStationOnMap = (stationId: string) => {
+    setSelectedStationId(stationId);
+    window.requestAnimationFrame(() => document.getElementById("mapa")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
+
+  const openStationInList = (stationId: string) => {
+    setSelectedStationId(stationId);
+    const stationIndex = officialStations.findIndex((station) => station.id === stationId);
+    if (stationIndex >= showCount) setShowCount(Math.ceil((stationIndex + 1) / 20) * 20);
+    window.setTimeout(() => document.getElementById(`station-${stationId.replace(/[^a-zA-Z0-9_-]/g, "-")}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+  };
+
   const toggleFavorite = (id: number | string) => {
     setFavorites((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   };
@@ -347,6 +370,13 @@ export default function StationExplorer({
     setShowCount(20);
   };
 
+  const toggleServiceFilter = (service: ServiceFilter) => {
+    setServiceFilters((current) => current.includes(service)
+      ? current.filter((item) => item !== service)
+      : [...current, service]);
+    setShowCount(20);
+  };
+
   const selectFuel = (nextFuel: FuelCode) => {
     setFuel(nextFuel);
     setRequiredProducts((current) => current.filter((product) => product !== nextFuel));
@@ -360,6 +390,7 @@ export default function StationExplorer({
     setLocation(null);
     setSort("price");
     setRequiredProducts([]);
+    setServiceFilters([]);
     setFuel(initialFuel);
     setShowCount(20);
   };
@@ -419,9 +450,9 @@ export default function StationExplorer({
       return;
     }
     const payload = await response.json() as { stats?: { average: number; count: number } };
-    if (payload.stats && ratingDimension !== "overall") {
-      const ratingField = `${ratingDimension}Rating` as "bathroomRating" | "coffeeRating" | "cleanlinessRating";
-      const countField = `${ratingDimension}Count` as "bathroomCount" | "coffeeCount" | "cleanlinessCount";
+    if (payload.stats) {
+      const ratingField = `${ratingDimension}Rating` as "overallRating" | "bathroomRating" | "coffeeRating" | "cleanlinessRating";
+      const countField = `${ratingDimension}Count` as "overallCount" | "bathroomCount" | "coffeeCount" | "cleanlinessCount";
       setOfficialState((current) => ({
         ...current,
         stations: current.stations.map((station) => station.id === stationId
@@ -575,9 +606,9 @@ export default function StationExplorer({
       </header>
 
       <section className="hero">
-        <div className="eyebrow"><span /> Paradas que sí merecen la pena</div>
-        <h1>Gasolineras en ruta:<br /><em>¿dónde paramos?</em></h1>
-        <p>Café rico, baños limpios y combustible al mejor precio. Todo en una sola parada.</p>
+        <div className="eyebrow"><span /> MAPA NACIONAL DE PARADAS</div>
+        <h1>Encuentra tu <em>mejor parada</em></h1>
+        <p>Filtra el mapa por combustible, ubicación y precio. Después compara baños, café y puntuaciones.</p>
 
         <div className="route-card">
           <div className="route-field">
@@ -649,9 +680,27 @@ export default function StationExplorer({
               aria-pressed={requiredProducts.includes("adblue")}
               onClick={() => toggleRequiredProduct("adblue")}
             ><Droplets size={16} /> Tiene AdBlue</button> : null}
-          <button><Zap size={16} /> Carga EV</button>
+          <button className={serviceFilters.includes("bathroom") ? "active" : ""} aria-pressed={serviceFilters.includes("bathroom")} onClick={() => toggleServiceFilter("bathroom")}><Bath size={16} /> Baños</button>
+          <button className={serviceFilters.includes("coffee") ? "active" : ""} aria-pressed={serviceFilters.includes("coffee")} onClick={() => toggleServiceFilter("coffee")}><Coffee size={16} /> Cafetería</button>
+          <button className={serviceFilters.includes("restaurant") ? "active" : ""} aria-pressed={serviceFilters.includes("restaurant")} onClick={() => toggleServiceFilter("restaurant")}><UtensilsCrossed size={16} /> Restaurante</button>
+          <button className={serviceFilters.includes("rated") ? "active" : ""} aria-pressed={serviceFilters.includes("rated")} onClick={() => toggleServiceFilter("rated")}><Star size={16} /> Con puntuación</button>
           <button onClick={() => setFilterOpen(true)}><ListFilter size={16} /> Más</button>
         </div>
+      </section>
+
+      <section className="map-stage" aria-labelledby="map-heading">
+        <div className="map-stage-head">
+          <div><span>RESULTADOS EN EL MAPA</span><h2 id="map-heading">{officialLoading ? "Buscando gasolineras…" : `${officialTotal.toLocaleString("es-ES")} coincidencias`}</h2></div>
+          <small>Toca una ficha para localizarla</small>
+        </div>
+        <StationMap
+          stations={officialStations}
+          selectedId={selectedStationId}
+          userLocation={location}
+          loading={officialLoading}
+          onSelect={setSelectedStationId}
+          onOpenList={openStationInList}
+        />
       </section>
 
       <section className="results-section" id="explorar">
@@ -660,7 +709,7 @@ export default function StationExplorer({
             <span className="result-kicker">CATÁLOGO OFICIAL · MITECO</span>
             <h2>{officialLoading ? "Buscando paradas…" : `${officialTotal.toLocaleString("es-ES")} con ${selectedFuel.label}`}</h2>
           </div>
-          <label className="result-sort"><ListFilter size={14} /><select value={sort} onChange={(event) => { setSort(event.target.value as SortMode); setShowCount(20); }} aria-label="Ordenar resultados"><option value="price">Más baratas</option><option value="distance" disabled={!location}>Más cercanas</option></select></label>
+          <label className="result-sort"><ListFilter size={14} /><select value={sort} onChange={(event) => { setSort(event.target.value as SortMode); setShowCount(20); }} aria-label="Ordenar resultados"><option value="price">Más baratas</option><option value="rating">Mejor puntuadas</option><option value="distance" disabled={!location}>Más cercanas</option></select></label>
         </div>
 
         <p className="official-context"><ShieldCheck size={14} /> {location ? "Estaciones en un radio de 75 km; la distancia es en línea recta." : province ? `Resultados oficiales en ${provinceLabel}.` : "Búsqueda nacional en toda España."} Precio y disponibilidad procedentes de MITECO.</p>
@@ -681,7 +730,7 @@ export default function StationExplorer({
 
         <div className="official-list">
           {visibleOfficialStations.map((station) => (
-            <article className={`official-card ${recommendedStationId === station.id ? "recommended" : ""}`} id={`station-${station.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`} key={station.id}>
+            <article className={`official-card ${recommendedStationId === station.id ? "recommended" : ""} ${selectedStationId === station.id ? "map-selected" : ""}`} id={`station-${station.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`} key={station.id}>
               {recommendedStationId === station.id ? <span className="recommended-ribbon"><Sparkles size={11} /> Mejor equilibrio</span> : null}
               <div className="official-card-head">
                 <div className="station-logo official">{(station.brand || station.name).slice(0, 1)}</div>
@@ -698,6 +747,10 @@ export default function StationExplorer({
                 {stationHighlights(station).map((item) => <div className={item.className} key={item.label}><span>{item.label}</span><strong>{item.value}</strong><small>{item.detail}</small></div>)}
               </div>
               <div className="official-source"><Check size={13} /> MITECO · {formatOfficialTime(station.priceObservedAt)}</div>
+              <button className="overall-score" onClick={() => { setRatingStation(station.id); setRatingDimension("overall"); }}>
+                <span><Star size={15} fill="currentColor" /> {station.overallCount ? Number(station.overallRating).toFixed(1) : "Sin nota"}</span>
+                <small>{station.overallCount ? `${station.overallCount} valoraciones de la parada` : "Sé la primera persona en puntuarla"}</small>
+              </button>
               {(fuel === "lpg" || fuel === "adblue") && recentConfirmation(station.fuelCommunityStatus, station.fuelCommunityAt) ? (
                 <div className={`fuel-confirmation ${station.fuelCommunityStatus === "working" ? "positive" : "warning"}`}>
                   {station.fuelCommunityStatus === "working" ? <ShieldCheck size={15} /> : <X size={15} />}
@@ -714,8 +767,9 @@ export default function StationExplorer({
               </div>
               <button className="confirm-now" onClick={() => openConfirmation(station)}><LocateFixed size={16} /> Confirmar GLP, AdBlue o servicios <span>10 s</span></button>
               <div className="official-actions">
+                <button className="map-action" onClick={() => focusStationOnMap(station.id)}><MapPin size={16} /> Ver en mapa</button>
                 <a href={`https://www.google.com/maps/search/?api=1&query=${station.latE6 / 1_000_000},${station.lngE6 / 1_000_000}`} target="_blank" rel="noreferrer"><Navigation size={16} /> Cómo llegar</a>
-                <button onClick={() => { setRatingStation(ratingStation === station.id ? null : station.id); setRatingDimension("overall"); }}><Star size={16} /> Valorar parada</button>
+                <button onClick={() => { setRatingStation(ratingStation === station.id ? null : station.id); setRatingDimension("overall"); }}><Star size={16} /> Puntuar</button>
               </div>
               {ratingStation === station.id ? (
                 <div className="rating-picker">
@@ -789,7 +843,13 @@ export default function StationExplorer({
             <div className="filter-options">
               <button className={requiredProducts.includes("lpg") ? "selected" : ""} aria-pressed={requiredProducts.includes("lpg")} onClick={() => toggleRequiredProduct("lpg")}><span>Debe tener GLP</span><Check size={16} /></button>
               <button className={requiredProducts.includes("adblue") ? "selected" : ""} aria-pressed={requiredProducts.includes("adblue")} onClick={() => toggleRequiredProduct("adblue")}><span>Debe tener AdBlue</span><Check size={16} /></button>
-              {["Cafetería", "Baños accesibles", "Zona infantil", "Duchas", "Carga rápida", "Abierto 24 h"].map((item) => <button key={item} disabled title="Disponible al completar la verificación comunitaria"><span>{item}</span><small>pronto</small></button>)}
+              {[
+                { code: "bathroom" as const, label: "Baños confirmados" },
+                { code: "coffee" as const, label: "Cafetería confirmada" },
+                { code: "restaurant" as const, label: "Restaurante confirmado" },
+                { code: "rated" as const, label: "Con puntuaciones" },
+              ].map((item) => <button className={serviceFilters.includes(item.code) ? "selected" : ""} aria-pressed={serviceFilters.includes(item.code)} key={item.code} onClick={() => toggleServiceFilter(item.code)}><span>{item.label}</span><Check size={16} /></button>)}
+              {["Abierto 24 h", "Duchas"].map((item) => <button key={item} disabled title="Disponible cuando completemos esta fuente"><span>{item}</span><small>pronto</small></button>)}
             </div>
             <button className="primary-action" onClick={() => { setFilterOpen(false); showToast("Filtros aplicados"); }}>Ver paradas</button>
           </section>
