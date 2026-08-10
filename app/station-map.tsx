@@ -1,6 +1,6 @@
 "use client";
 
-import { Layers3, LocateFixed, Map, MapPin, Navigation, Star } from "lucide-react";
+import { Layers3, LocateFixed, Map, MapPin, Navigation, Search, Star } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Map as MapLibreMap, Marker as MapLibreMarker } from "maplibre-gl";
 
@@ -27,6 +27,13 @@ export type MapStation = {
   cleanlinessStatus?: string | null;
 };
 
+export type VisibleMapBounds = {
+  west: number;
+  south: number;
+  east: number;
+  north: number;
+};
+
 type Props = {
   stations: MapStation[];
   selectedId: string | null;
@@ -34,10 +41,12 @@ type Props = {
   loading: boolean;
   fuelLabel: string;
   personalRatings: Record<string, number>;
+  lockViewport: boolean;
   onSelect: (stationId: string) => void;
   onOpenList: (stationId: string) => void;
   onDirections: (stationId: string) => void;
   onRequestLocation: () => void;
+  onSearchVisibleArea: (bounds: VisibleMapBounds) => void;
 };
 
 const SPAIN_BOUNDS: [[number, number], [number, number]] = [[-18.5, 27.4], [4.5, 43.9]];
@@ -46,7 +55,7 @@ function formatPrice(micros: number) {
   return `${(micros / 1_000_000).toLocaleString("es-ES", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} €`;
 }
 
-export default function StationMap({ stations, selectedId, userLocation, loading, fuelLabel, personalRatings, onSelect, onOpenList, onDirections, onRequestLocation }: Props) {
+export default function StationMap({ stations, selectedId, userLocation, loading, fuelLabel, personalRatings, lockViewport, onSelect, onOpenList, onDirections, onRequestLocation, onSearchVisibleArea }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markersRef = useRef<MapLibreMarker[]>([]);
@@ -56,6 +65,7 @@ export default function StationMap({ stations, selectedId, userLocation, loading
   const [mapError, setMapError] = useState(false);
   const [perspective, setPerspective] = useState(false);
   const [mapAttempt, setMapAttempt] = useState(0);
+  const [showAreaSearch, setShowAreaSearch] = useState(false);
 
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
   const mappableStations = useMemo(
@@ -100,6 +110,9 @@ export default function StationMap({ stations, selectedId, userLocation, loading
         if (loadTimer) clearTimeout(loadTimer);
         setMapError(false);
         setReady(true);
+      });
+      map.on("moveend", (event) => {
+        if (event.originalEvent) setShowAreaSearch(true);
       });
     }).catch(() => setMapError(true));
     return () => {
@@ -148,6 +161,7 @@ export default function StationMap({ stations, selectedId, userLocation, loading
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
+    if (lockViewport) return;
     if (userLocation) {
       map.flyTo({
         center: [userLocation.longitude, userLocation.latitude],
@@ -168,7 +182,7 @@ export default function StationMap({ stations, selectedId, userLocation, loading
       [Math.min(...longitudes), Math.min(...latitudes)],
       [Math.max(...longitudes), Math.max(...latitudes)],
     ], { padding: 52, maxZoom: 12, duration: 650 });
-  }, [mappableStations, perspective, ready, userLocation]);
+  }, [lockViewport, mappableStations, perspective, ready, userLocation]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -218,6 +232,19 @@ export default function StationMap({ stations, selectedId, userLocation, loading
     setMapAttempt((attempt) => attempt + 1);
   };
 
+  const searchVisibleArea = () => {
+    const map = mapRef.current;
+    if (!map) return;
+    const bounds = map.getBounds();
+    onSearchVisibleArea({
+      west: bounds.getWest(),
+      south: bounds.getSouth(),
+      east: bounds.getEast(),
+      north: bounds.getNorth(),
+    });
+    setShowAreaSearch(false);
+  };
+
   const serviceValue = (status?: string | null, rating?: number | null, count?: number) => {
     if (status === "clean" || status === "good" || status === "working") return "Confirmado";
     if (status === "dirty" || status === "poor" || status === "broken" || status === "no_product") return "Aviso";
@@ -230,9 +257,10 @@ export default function StationMap({ stations, selectedId, userLocation, loading
       <div ref={containerRef} className="stations-map" />
       {!ready && !mapError ? <div className="map-loading"><span /><strong>Cargando mapa…</strong></div> : null}
       {mapError ? <div className="map-loading error"><MapPin size={24} /><strong>No se pudo cargar el mapa</strong><span>La lista sigue disponible más abajo.</span><button onClick={retryMap}>Reintentar</button></div> : null}
+      {ready && showAreaSearch ? <button className="map-search-area" onClick={searchVisibleArea}><Search size={17} /> Buscar en esta zona</button> : null}
       <div className={`map-toolbar ${selectedStation ? "with-selection" : ""}`}>
         <div className="map-toolbar-count"><MapPin size={14} /><strong>{mappableStations.length}</strong><span>{userLocation ? "cerca de ti" : "en el mapa"}{visiblePersonalRatingCount ? ` · ★ ${visiblePersonalRatingCount} tuyas` : ""}{loading ? " · actualizando…" : ""}</span></div>
-        <button className="map-location-action" onClick={userLocation ? recenter : onRequestLocation}>
+        <button className="map-location-action" onClick={userLocation ? () => { recenter(); onRequestLocation(); } : onRequestLocation}>
           <LocateFixed size={16} /><span>{userLocation ? "Mi posición" : "Usar ubicación"}</span>
         </button>
         <div className="map-mode-switch" aria-label="Perspectiva del mapa">

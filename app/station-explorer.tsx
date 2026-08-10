@@ -14,7 +14,6 @@ import {
   LocateFixed,
   MapPin,
   Navigation,
-  Plus,
   Search,
   ShieldCheck,
   Sparkles,
@@ -25,11 +24,12 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import StationMap from "./station-map";
+import StationMap, { type VisibleMapBounds } from "./station-map";
 
 type FuelCode = "diesel_a" | "gasoline_95_e5" | "lpg" | "adblue";
 type ProductCode = "lpg" | "adblue";
 type SortMode = "price" | "distance" | "rating";
+type ActiveNav = "map" | "search" | "saved" | "profile";
 type RatingDimension = "overall" | "bathroom" | "coffee" | "cleanliness";
 type ServiceFilter = "bathroom" | "coffee" | "restaurant" | "rated";
 type ConfirmationCategory = "lpg_status" | "adblue_status" | "bathroom" | "coffee" | "restaurant" | "cleanliness";
@@ -183,12 +183,15 @@ export default function StationExplorer({
   const [searchTerm, setSearchTerm] = useState("");
   const [province, setProvince] = useState("");
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [mapBounds, setMapBounds] = useState<VisibleMapBounds | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
   const [sort, setSort] = useState<SortMode>("price");
   const [fuel, setFuel] = useState<FuelCode>(initialFuel);
   const [requiredProducts, setRequiredProducts] = useState<ProductCode[]>([]);
   const [serviceFilters, setServiceFilters] = useState<ServiceFilter[]>([]);
   const [favorites, setFavorites] = useState<Array<number | string>>([]);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [activeNav, setActiveNav] = useState<ActiveNav>("map");
   const [filterOpen, setFilterOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [sessionUser, setSessionUser] = useState<{ signedIn: boolean; displayName: string | null }>({ signedIn: false, displayName: null });
@@ -215,7 +218,10 @@ export default function StationExplorer({
   const requiredProductsKey = [...requiredProducts].sort().join(",");
   const serviceFiltersKey = [...serviceFilters].sort().join(",");
   const locationKey = location ? `${location.latitude.toFixed(4)},${location.longitude.toFixed(4)}` : "national";
-  const officialRequestKey = `${fuel}|${province}|${requiredProductsKey}|${serviceFiltersKey}|${searchTerm}|${locationKey}|${sort}`;
+  const mapBoundsKey = mapBounds
+    ? `${mapBounds.west.toFixed(4)},${mapBounds.south.toFixed(4)},${mapBounds.east.toFixed(4)},${mapBounds.north.toFixed(4)}`
+    : "no-bounds";
+  const officialRequestKey = `${fuel}|${province}|${requiredProductsKey}|${serviceFiltersKey}|${searchTerm}|${locationKey}|${mapBoundsKey}|${sort}`;
   const officialLoading = (locationLoading && !location) || officialState.key !== officialRequestKey;
   const officialStations = useMemo(
     () => officialLoading ? [] : officialState.stations,
@@ -230,6 +236,15 @@ export default function StationExplorer({
   }, [query]);
 
   useEffect(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem("gasoliguapis:favorites") || "[]") as unknown;
+      if (Array.isArray(saved)) window.setTimeout(() => setFavorites(saved.filter((id) => typeof id === "string" || typeof id === "number")), 0);
+    } catch {
+      // A private browser session may make local storage unavailable.
+    }
+  }, []);
+
+  useEffect(() => {
     if (locationLoading && !location) return;
     const controller = new AbortController();
     const params = new URLSearchParams({ fuel, limit: "100", sort });
@@ -240,6 +255,7 @@ export default function StationExplorer({
       params.set("lng", location.longitude.toFixed(4));
       params.set("radiusKm", "75");
     }
+    if (mapBounds) params.set("bounds", mapBoundsKey);
     requiredProductsKey.split(",").filter(Boolean).forEach((product) => params.append("requires", product));
     serviceFiltersKey.split(",").filter(Boolean).forEach((service) => params.append("service", service));
     fetch(`/api/stations?${params.toString()}`, { signal: controller.signal })
@@ -272,6 +288,12 @@ export default function StationExplorer({
                 .filter(Boolean).join(" ").toLocaleLowerCase("es").includes(normalizedQuery))
               .filter((station) => !requiredProductsKey.split(",").includes("lpg") || lpgById.has(station.id))
               .filter((station) => !requiredProductsKey.split(",").includes("adblue") || adblueById.has(station.id))
+              .filter((station) => !mapBounds || (
+                station.lngE6 / 1_000_000 >= mapBounds.west
+                && station.lngE6 / 1_000_000 <= mapBounds.east
+                && station.latE6 / 1_000_000 >= mapBounds.south
+                && station.latE6 / 1_000_000 <= mapBounds.north
+              ))
               .map((station): OfficialStation => {
                 const lpgStation = lpgById.get(station.id);
                 const adblueStation = adblueById.get(station.id);
@@ -299,7 +321,7 @@ export default function StationExplorer({
                 };
               })
               .filter(() => serviceFiltersKey.length === 0)
-              .filter((station) => !location || Number(station.distanceKm) <= 75)
+              .filter((station) => !location || mapBounds || Number(station.distanceKm) <= 75)
               .sort((left, right) => sort === "distance"
                 ? Number(left.distanceKm) - Number(right.distanceKm)
                 : sort === "rating"
@@ -319,13 +341,17 @@ export default function StationExplorer({
         });
       });
     return () => controller.abort();
-  }, [fuel, location, locationLoading, officialRequestKey, province, requiredProductsKey, searchTerm, serviceFiltersKey, sort]);
+  }, [fuel, location, locationLoading, mapBounds, mapBoundsKey, officialRequestKey, province, requiredProductsKey, searchTerm, serviceFiltersKey, sort]);
 
+  const filteredOfficialStations = useMemo(
+    () => favoritesOnly ? officialStations.filter((station) => favorites.includes(station.id)) : officialStations,
+    [favorites, favoritesOnly, officialStations],
+  );
   const orderedOfficialStations = useMemo(() => {
-    if (!selectedStationId) return officialStations;
-    const selected = officialStations.find((station) => station.id === selectedStationId);
-    if (!selected) return officialStations;
-    const nearbyAlternatives = officialStations
+    if (!selectedStationId) return filteredOfficialStations;
+    const selected = filteredOfficialStations.find((station) => station.id === selectedStationId);
+    if (!selected) return filteredOfficialStations;
+    const nearbyAlternatives = filteredOfficialStations
       .filter((station) => station.id !== selectedStationId)
       .map((station) => ({
         station,
@@ -339,7 +365,7 @@ export default function StationExplorer({
       .sort((left, right) => left.selectedDistanceKm - right.selectedDistanceKm || left.station.priceMicros - right.station.priceMicros)
       .map(({ station }) => station);
     return [selected, ...nearbyAlternatives];
-  }, [officialStations, selectedStationId]);
+  }, [filteredOfficialStations, selectedStationId]);
   const visibleOfficialStations = useMemo(() => orderedOfficialStations.slice(0, showCount), [orderedOfficialStations, showCount]);
   const recommendedStationId = useMemo(() => {
     if (!location || officialStations.length === 0) return null;
@@ -367,13 +393,60 @@ export default function StationExplorer({
     ? officialStations.find((station) => station.id === selectedStationId) ?? null
     : null;
 
+  const scrollToSection = (id: "mapa" | "buscar" | "explorar") => {
+    window.requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
+
+  const searchVisibleMapArea = (bounds: VisibleMapBounds) => {
+    setMapBounds(bounds);
+    setProvince("");
+    setSelectedStationId(null);
+    setFavoritesOnly(false);
+    setShowCount(20);
+    setActiveNav("map");
+    showToast("Buscando en toda el área visible");
+  };
+
+  const showMap = () => {
+    setFavoritesOnly(false);
+    setActiveNav("map");
+    scrollToSection("mapa");
+  };
+
+  const showSearch = () => {
+    setFavoritesOnly(false);
+    setActiveNav("search");
+    scrollToSection("buscar");
+  };
+
+  const showSavedStations = () => {
+    setFavoritesOnly(true);
+    setSelectedStationId(null);
+    setShowCount(20);
+    setActiveNav("saved");
+    scrollToSection("explorar");
+    if (favorites.length === 0) showToast("Guarda una parada con el corazón para verla aquí");
+  };
+
+  const contributeStation = selectedOfficialStation ?? recommendedStation ?? officialStations[0] ?? null;
+  const contribute = () => {
+    if (!contributeStation) {
+      showToast("Busca y selecciona una estación para confirmar sus datos");
+      showMap();
+      return;
+    }
+    openConfirmation(contributeStation);
+  };
+
   const focusStationOnMap = (stationId: string) => {
     setSelectedStationId(stationId);
+    setActiveNav("map");
     window.requestAnimationFrame(() => document.getElementById("mapa")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
 
   const openStationInList = (stationId: string) => {
     setSelectedStationId(stationId);
+    setActiveNav("search");
     setShowCount((current) => Math.max(current, 20));
     window.setTimeout(() => document.getElementById(`station-${stationId.replace(/[^a-zA-Z0-9_-]/g, "-")}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
   };
@@ -384,7 +457,13 @@ export default function StationExplorer({
   };
 
   const toggleFavorite = (id: number | string) => {
-    setFavorites((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+    setFavorites((current) => {
+      const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
+      try { window.localStorage.setItem("gasoliguapis:favorites", JSON.stringify(next)); } catch {
+        // Favorites remain available for this visit if storage is unavailable.
+      }
+      return next;
+    });
   };
 
   const showToast = (message: string) => {
@@ -417,10 +496,12 @@ export default function StationExplorer({
     setSearchTerm("");
     setProvince("");
     setLocation(null);
+    setMapBounds(null);
     setSort("price");
     setRequiredProducts([]);
     setServiceFilters([]);
     setFuel(initialFuel);
+    setFavoritesOnly(false);
     setShowCount(20);
   };
 
@@ -432,6 +513,7 @@ export default function StationExplorer({
     setLocationLoading(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        setMapBounds(null);
         setLocation({
           latitude: Number(position.coords.latitude.toFixed(4)),
           longitude: Number(position.coords.longitude.toFixed(4)),
@@ -457,6 +539,7 @@ export default function StationExplorer({
     }
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        setMapBounds(null);
         setLocation({
           latitude: Number(position.coords.latitude.toFixed(4)),
           longitude: Number(position.coords.longitude.toFixed(4)),
@@ -693,16 +776,18 @@ export default function StationExplorer({
         <h1 className="sr-only" id="map-heading">MAPA NACIONAL DE PARADAS · Encuentra tu mejor parada y las gasolineras cerca de ti</h1>
         <div className="map-canvas-shell">
           <StationMap
-            stations={officialStations}
+            stations={filteredOfficialStations}
             selectedId={selectedStationId}
             userLocation={location}
             loading={officialLoading}
             fuelLabel={selectedFuel.label}
             personalRatings={personalRatings}
-            onSelect={setSelectedStationId}
+            lockViewport={Boolean(mapBounds)}
+            onSelect={(stationId) => { setSelectedStationId(stationId); setActiveNav("map"); }}
             onOpenList={openStationInList}
             onDirections={openDirections}
             onRequestLocation={useMyLocation}
+            onSearchVisibleArea={searchVisibleMapArea}
           />
         </div>
       </section>
@@ -724,6 +809,8 @@ export default function StationExplorer({
                 onChange={(event) => {
                   setProvince(event.target.value);
                   setLocation(null);
+                  setMapBounds(null);
+                  setFavoritesOnly(false);
                   setSort("price");
                   setShowCount(20);
                 }}
@@ -795,21 +882,21 @@ export default function StationExplorer({
       <section className="results-section" id="explorar">
         <div className="results-head">
           <div>
-            <span className="result-kicker">CATÁLOGO OFICIAL · MITECO</span>
-            <h2>{officialLoading ? "Buscando paradas…" : `${officialTotal.toLocaleString("es-ES")} con ${selectedFuel.label}`}</h2>
+            <span className="result-kicker">{favoritesOnly ? "GUARDADAS EN ESTE DISPOSITIVO" : mapBounds ? "ÁREA VISIBLE · MITECO" : "CATÁLOGO OFICIAL · MITECO"}</span>
+            <h2>{officialLoading ? "Buscando paradas…" : favoritesOnly ? `${filteredOfficialStations.length.toLocaleString("es-ES")} guardadas en estos resultados` : `${officialTotal.toLocaleString("es-ES")} con ${selectedFuel.label}`}</h2>
           </div>
           <label className="result-sort"><ListFilter size={14} /><select value={selectedStationId ? "selected" : sort} onChange={(event) => { setSelectedStationId(null); setSort(event.target.value as SortMode); setShowCount(20); }} aria-label="Ordenar resultados">{selectedStationId ? <option value="selected">Seleccionada + cercanas</option> : null}<option value="price">Más baratas</option><option value="rating">Mejor puntuadas</option><option value="distance" disabled={!location}>Más cercanas</option></select></label>
         </div>
 
-        <p className="official-context"><ShieldCheck size={14} /> {location ? "Estaciones en un radio de 75 km; la distancia es en línea recta." : province ? `Resultados oficiales en ${provinceLabel}.` : "Búsqueda nacional en toda España."} Precio y disponibilidad procedentes de MITECO.</p>
+        <p className="official-context"><ShieldCheck size={14} /> {favoritesOnly ? "Tus guardadas se conservan en este dispositivo y respetan los filtros actuales." : mapBounds ? "Estaciones dentro del rectángulo visible del mapa; mueve el mapa para buscar en otra zona." : location ? "Estaciones en un radio de 75 km; la distancia es en línea recta." : province ? `Resultados oficiales en ${provinceLabel}.` : "Búsqueda nacional en toda España."} Precio y disponibilidad procedentes de MITECO.</p>
 
         {officialError ? <div className="official-message error"><X size={18} /> {officialError}</div> : null}
         {!officialLoading && !officialError && visibleOfficialStations.length === 0 ? (
-          <div className="official-message"><Fuel size={19} /><div><strong>Aún no aparecen estaciones con estos criterios</strong><span>Prueba otra búsqueda, quita GLP o AdBlue, o cambia de tramo.</span><button onClick={clearFilters}>Limpiar filtros</button></div></div>
+          <div className="official-message"><Fuel size={19} /><div><strong>{favoritesOnly ? "No tienes paradas guardadas en estos resultados" : "Aún no aparecen estaciones con estos criterios"}</strong><span>{favoritesOnly ? "Vuelve a explorar y toca el corazón de una estación para guardarla." : "Prueba otra búsqueda, quita GLP o AdBlue, o cambia de tramo."}</span><button onClick={favoritesOnly ? showSearch : clearFilters}>{favoritesOnly ? "Volver a buscar" : "Limpiar filtros"}</button></div></div>
         ) : null}
         {officialLoading ? <div className="official-loading"><span /><span /><span /></div> : null}
 
-        {recommendedStation && !officialLoading ? (
+        {recommendedStation && !officialLoading && !favoritesOnly && !mapBounds ? (
           <div className="recommendation-card">
             <Sparkles size={19} />
             <div><span>NUESTRA PROPUESTA CERCA DE TI</span><strong>{recommendedStation.name}</strong><small>{Number(recommendedStation.distanceKm).toFixed(1)} km · {formatPrice(recommendedStation.priceMicros)} · equilibrio entre cercanía, precio y valoraciones disponibles</small></div>
@@ -875,10 +962,10 @@ export default function StationExplorer({
           ))}
         </div>
 
-        {!officialLoading && showCount < officialStations.length ? (
+        {!officialLoading && showCount < filteredOfficialStations.length ? (
           <button className="load-more" onClick={() => setShowCount((current) => current + 20)}>Ver 20 estaciones más</button>
         ) : null}
-        {!officialLoading && officialTotal > officialStations.length ? <p className="result-limit">Mostramos las 100 mejores coincidencias. Usa provincia, búsqueda o cercanía para afinar.</p> : null}
+        {!officialLoading && !favoritesOnly && officialTotal > officialStations.length ? <p className="result-limit">Mostramos las 100 mejores coincidencias. Usa provincia, búsqueda o cercanía para afinar.</p> : null}
 
         <aside className="trust-strip">
           <ShieldCheck size={18} />
@@ -897,13 +984,13 @@ export default function StationExplorer({
         </div>
       </section>
 
-      <button className="contribute" onClick={openLogin}><Plus size={22} /> <span>Añadir una parada</span></button>
+      <button className="contribute" onClick={contribute} aria-label="Confirmar datos de una estación"><ShieldCheck size={22} /> <span>Confirmar datos</span></button>
 
       <nav className="bottom-nav" aria-label="Navegación principal">
-        <Link className="active" href="#explorar"><Search size={21} /><span>Explorar</span></Link>
-        <Link href="/calculadora-ahorro-combustible"><Fuel size={21} /><span>Ahorro</span></Link>
-        <button onClick={() => showToast(`${favorites.length} paradas guardadas`)}><Bookmark size={21} /><span>Guardadas</span></button>
-        <button onClick={openLogin}><UserRound size={21} /><span>Perfil</span></button>
+        <button className={activeNav === "map" ? "active" : ""} onClick={showMap}><MapPin size={21} /><span>Mapa</span></button>
+        <button className={activeNav === "search" ? "active" : ""} onClick={showSearch}><Search size={21} /><span>Buscar</span></button>
+        <button className={activeNav === "saved" ? "active" : ""} onClick={showSavedStations}><Bookmark size={21} /><span>Guardadas{favorites.length ? ` (${favorites.length})` : ""}</span></button>
+        <button className={activeNav === "profile" ? "active" : ""} onClick={() => { setActiveNav("profile"); void openLogin(); }}><UserRound size={21} /><span>Perfil</span></button>
       </nav>
 
       {directionsStation ? (

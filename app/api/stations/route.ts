@@ -59,6 +59,16 @@ export async function GET(request: Request) {
   const longitude = Number(url.searchParams.get("lng"));
   const hasLocation = Number.isFinite(latitude) && latitude >= 27 && latitude <= 44.5
     && Number.isFinite(longitude) && longitude >= -19 && longitude <= 5;
+  const rawBounds = (url.searchParams.get("bounds") || "").split(",").map(Number);
+  const mapBounds = rawBounds.length === 4 && rawBounds.every(Number.isFinite)
+    ? {
+        west: Math.max(-19, rawBounds[0]),
+        south: Math.max(27, rawBounds[1]),
+        east: Math.min(5, rawBounds[2]),
+        north: Math.min(44.5, rawBounds[3]),
+      }
+    : null;
+  const hasMapBounds = Boolean(mapBounds && mapBounds.west < mapBounds.east && mapBounds.south < mapBounds.north);
   const requestedRadius = Number(url.searchParams.get("radiusKm") || 75);
   const radiusKm = Number.isFinite(requestedRadius) ? Math.min(250, Math.max(5, requestedRadius)) : 75;
   const sort = requestedSort === "distance" && !hasLocation ? "price" : requestedSort;
@@ -81,7 +91,7 @@ export async function GET(request: Request) {
   const lngDelta = hasLocation ? radiusKm / (111 * Math.max(0.2, Math.cos(latitude * Math.PI / 180))) : 0;
   const targetLatE6 = Math.round(latitude * 1_000_000);
   const targetLngE6 = Math.round(longitude * 1_000_000);
-  const locationClause = hasLocation ? "AND s.lat_e6 BETWEEN ? AND ? AND s.lng_e6 BETWEEN ? AND ?" : "";
+  const areaClause = hasMapBounds || hasLocation ? "AND s.lat_e6 BETWEEN ? AND ? AND s.lng_e6 BETWEEN ? AND ?" : "";
   const orderClause = sort === "distance"
     ? "ORDER BY ABS(s.lat_e6 - ?) + ABS(s.lng_e6 - ?) ASC, p.price_micros ASC"
     : sort === "rating"
@@ -96,12 +106,18 @@ export async function GET(request: Request) {
       fuel, province || null, province || null, queryLike, queryLike, requiresLpg, requiresAdblue,
       requiresBathroom, requiresCoffee, requiresRestaurant, requiresRating,
     ];
-    if (hasLocation) values.push(
-      Math.round((latitude - latDelta) * 1_000_000),
-      Math.round((latitude + latDelta) * 1_000_000),
-      Math.round((longitude - lngDelta) * 1_000_000),
-      Math.round((longitude + lngDelta) * 1_000_000),
+    if (hasMapBounds && mapBounds) values.push(
+      Math.round(mapBounds.south * 1_000_000),
+      Math.round(mapBounds.north * 1_000_000),
+      Math.round(mapBounds.west * 1_000_000),
+      Math.round(mapBounds.east * 1_000_000),
     );
+    else if (hasLocation) values.push(
+        Math.round((latitude - latDelta) * 1_000_000),
+        Math.round((latitude + latDelta) * 1_000_000),
+        Math.round((longitude - lngDelta) * 1_000_000),
+        Math.round((longitude + lngDelta) * 1_000_000),
+      );
     if (sort === "distance") values.push(targetLatE6, targetLngE6);
     values.push(limit);
     const rows = await database.prepare(`SELECT
@@ -149,7 +165,7 @@ export async function GET(request: Request) {
       AND (? = 0 OR coffee_check.latest_status = 'good' OR EXISTS (SELECT 1 FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'coffee'))
       AND (? = 0 OR restaurant_check.latest_status = 'good')
       AND (? = 0 OR EXISTS (SELECT 1 FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'overall'))
-      ${locationClause}
+      ${areaClause}
     ${orderClause}
     LIMIT ?`).bind(...values).all<Record<string, unknown>>();
     const rawRows = rows.results || [];
@@ -159,7 +175,7 @@ export async function GET(request: Request) {
         ...station,
         distanceKm: haversineKm(latitude, longitude, Number(station.latE6) / 1_000_000, Number(station.lngE6) / 1_000_000),
       } : station)
-      .filter((station) => !hasLocation || Number(station.distanceKm) <= radiusKm);
+      .filter((station) => !hasLocation || hasMapBounds || Number(station.distanceKm) <= radiusKm);
     if (data.length > 0) databaseInitialized = true;
     else {
       const source = await database.prepare("SELECT id FROM data_sources WHERE id = 'miteco-prices' LIMIT 1").all<{ id: string }>();
@@ -198,6 +214,12 @@ export async function GET(request: Request) {
           .filter(Boolean).join(" ").toLocaleLowerCase("es").includes(query.toLocaleLowerCase("es")))
         .filter((station) => !requiresLpg || lpgByStation.has(station.IDEESS))
         .filter((station) => !requiresAdblue || adblueByStation.has(station.IDEESS))
+        .filter((station) => {
+          if (!hasMapBounds || !mapBounds) return true;
+          const lat = Number((station.Latitud || "0").replace(",", "."));
+          const lng = Number((station["Longitud (WGS84)"] || "0").replace(",", "."));
+          return lng >= mapBounds.west && lng <= mapBounds.east && lat >= mapBounds.south && lat <= mapBounds.north;
+        })
         .filter(() => services.length === 0)
         .map((station) => {
           const selectedPrice = decimal(station.PrecioProducto) as number;
@@ -243,7 +265,7 @@ export async function GET(request: Request) {
             distanceKm: hasLocation ? haversineKm(latitude, longitude, lat, lng) : null,
           };
         })
-        .filter((station) => !hasLocation || Number(station.distanceKm) <= radiusKm)
+        .filter((station) => !hasLocation || hasMapBounds || Number(station.distanceKm) <= radiusKm)
         .sort((a, b) => sort === "distance"
           ? Number(a.distanceKm) - Number(b.distanceKm)
           : sort === "rating"
@@ -262,7 +284,7 @@ export async function GET(request: Request) {
     source: "MITECO",
     delivery,
     total,
-    scope: hasLocation ? { kind: "nearby", radiusKm, latitude, longitude } : province ? { kind: "province", province } : { kind: "national" },
+    scope: hasMapBounds && mapBounds ? { kind: "map", bounds: mapBounds } : hasLocation ? { kind: "nearby", radiusKm, latitude, longitude } : province ? { kind: "province", province } : { kind: "national" },
     sort,
     data,
     attribution: "Origen de los datos: Ministerio para la Transición Ecológica y el Reto Demográfico",

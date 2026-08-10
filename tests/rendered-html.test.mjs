@@ -126,6 +126,8 @@ test("connects the filtered station list to an interactive map", async () => {
   assert.match(css, /\.map-station-marker \{[^}]*position: absolute;/);
   assert.doesNotMatch(css, /\.map-station-marker \{[^}]*position: relative;/);
   assert.match(map, /onRequestLocation/);
+  assert.match(map, /Buscar en esta zona/);
+  assert.match(map, /getBounds/);
   assert.doesNotMatch(map, /map\.on\("error"/);
   assert.match(explorer, /Ver en mapa/);
   assert.match(explorer, /Google Maps/);
@@ -138,10 +140,15 @@ test("connects the filtered station list to an interactive map", async () => {
   assert.match(explorer, /km de la seleccionada/);
   assert.match(explorer, /serviceFilters/);
   assert.match(explorer, /personalRatings/);
+  assert.match(explorer, /gasoliguapis:favorites/);
+  assert.match(explorer, /GUARDADAS EN ESTE DISPOSITIVO/);
+  assert.match(explorer, /Confirmar datos/);
   assert.match(map, /map-marker-user-rating/);
   assert.match(css, /rating-low/);
   assert.match(css, /rating-mid/);
   assert.match(css, /rating-high/);
   assert.match(stationsApi, /sortParam === "rating"/);
+  assert.match(stationsApi, /hasMapBounds/);
+  assert.match(stationsApi, /kind: "map"/);
   assert.match(stationsApi, /restaurant_check\.latest_status/);
 });
