@@ -202,6 +202,7 @@ export default function StationExplorer({
   const [ratingStation, setRatingStation] = useState<string | null>(null);
   const [ratingDimension, setRatingDimension] = useState<RatingDimension>("overall");
   const [confirmationStation, setConfirmationStation] = useState<OfficialStation | null>(null);
+  const [directionsStation, setDirectionsStation] = useState<OfficialStation | null>(null);
   const [confirmationCategory, setConfirmationCategory] = useState<ConfirmationCategory>("bathroom");
   const [confirmationSaving, setConfirmationSaving] = useState(false);
   const [clockNow] = useState(Date.now);
@@ -318,7 +319,12 @@ export default function StationExplorer({
     return () => controller.abort();
   }, [fuel, location, officialRequestKey, province, requiredProductsKey, searchTerm, serviceFiltersKey, sort]);
 
-  const visibleOfficialStations = useMemo(() => officialStations.slice(0, showCount), [officialStations, showCount]);
+  const orderedOfficialStations = useMemo(() => {
+    if (!selectedStationId) return officialStations;
+    const selected = officialStations.find((station) => station.id === selectedStationId);
+    return selected ? [selected, ...officialStations.filter((station) => station.id !== selectedStationId)] : officialStations;
+  }, [officialStations, selectedStationId]);
+  const visibleOfficialStations = useMemo(() => orderedOfficialStations.slice(0, showCount), [orderedOfficialStations, showCount]);
   const recommendedStationId = useMemo(() => {
     if (!location || officialStations.length === 0) return null;
     const candidates = officialStations.slice(0, 40);
@@ -349,9 +355,13 @@ export default function StationExplorer({
 
   const openStationInList = (stationId: string) => {
     setSelectedStationId(stationId);
-    const stationIndex = officialStations.findIndex((station) => station.id === stationId);
-    if (stationIndex >= showCount) setShowCount(Math.ceil((stationIndex + 1) / 20) * 20);
+    setShowCount((current) => Math.max(current, 20));
     window.setTimeout(() => document.getElementById(`station-${stationId.replace(/[^a-zA-Z0-9_-]/g, "-")}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+  };
+
+  const openDirections = (stationId: string) => {
+    const station = officialStations.find((item) => item.id === stationId);
+    if (station) setDirectionsStation(station);
   };
 
   const toggleFavorite = (id: number | string) => {
@@ -605,12 +615,24 @@ export default function StationExplorer({
         </div>
       </header>
 
-      <section className="hero">
-        <div className="eyebrow"><span /> MAPA NACIONAL DE PARADAS</div>
-        <h1>Encuentra tu <em>mejor parada</em></h1>
-        <p>Filtra el mapa por combustible, ubicación y precio. Después compara baños, café y puntuaciones.</p>
-
-        <div className="route-card">
+      <section className="map-stage advanced" aria-labelledby="map-heading">
+        <div className="map-stage-head advanced">
+          <div><span>MAPA NACIONAL DE PARADAS</span><h1 id="map-heading">Encuentra tu <em>mejor parada</em></h1><p>Combustible, servicios y puntuaciones sin salir del mapa.</p></div>
+          <small>{officialLoading ? "Buscando gasolineras…" : `${officialTotal.toLocaleString("es-ES")} coincidencias`}</small>
+        </div>
+        <div className="map-canvas-shell">
+          <StationMap
+            stations={officialStations}
+            selectedId={selectedStationId}
+            userLocation={location}
+            loading={officialLoading}
+            fuelLabel={selectedFuel.label}
+            onSelect={setSelectedStationId}
+            onOpenList={openStationInList}
+            onDirections={openDirections}
+          />
+          <div className="map-glass-search">
+            <div className="route-card">
           <div className="route-field">
             <div className="route-symbol origin"><span /></div>
             <div>
@@ -685,22 +707,9 @@ export default function StationExplorer({
           <button className={serviceFilters.includes("restaurant") ? "active" : ""} aria-pressed={serviceFilters.includes("restaurant")} onClick={() => toggleServiceFilter("restaurant")}><UtensilsCrossed size={16} /> Restaurante</button>
           <button className={serviceFilters.includes("rated") ? "active" : ""} aria-pressed={serviceFilters.includes("rated")} onClick={() => toggleServiceFilter("rated")}><Star size={16} /> Con puntuación</button>
           <button onClick={() => setFilterOpen(true)}><ListFilter size={16} /> Más</button>
+          </div>
         </div>
-      </section>
-
-      <section className="map-stage" aria-labelledby="map-heading">
-        <div className="map-stage-head">
-          <div><span>RESULTADOS EN EL MAPA</span><h2 id="map-heading">{officialLoading ? "Buscando gasolineras…" : `${officialTotal.toLocaleString("es-ES")} coincidencias`}</h2></div>
-          <small>Toca una ficha para localizarla</small>
         </div>
-        <StationMap
-          stations={officialStations}
-          selectedId={selectedStationId}
-          userLocation={location}
-          loading={officialLoading}
-          onSelect={setSelectedStationId}
-          onOpenList={openStationInList}
-        />
       </section>
 
       <section className="results-section" id="explorar">
@@ -731,7 +740,7 @@ export default function StationExplorer({
         <div className="official-list">
           {visibleOfficialStations.map((station) => (
             <article className={`official-card ${recommendedStationId === station.id ? "recommended" : ""} ${selectedStationId === station.id ? "map-selected" : ""}`} id={`station-${station.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`} key={station.id}>
-              {recommendedStationId === station.id ? <span className="recommended-ribbon"><Sparkles size={11} /> Mejor equilibrio</span> : null}
+              {selectedStationId === station.id ? <span className="recommended-ribbon selected"><MapPin size={11} /> Seleccionada en el mapa</span> : recommendedStationId === station.id ? <span className="recommended-ribbon"><Sparkles size={11} /> Mejor equilibrio</span> : null}
               <div className="official-card-head">
                 <div className="station-logo official">{(station.brand || station.name).slice(0, 1)}</div>
                 <div>
@@ -768,7 +777,7 @@ export default function StationExplorer({
               <button className="confirm-now" onClick={() => openConfirmation(station)}><LocateFixed size={16} /> Confirmar GLP, AdBlue o servicios <span>10 s</span></button>
               <div className="official-actions">
                 <button className="map-action" onClick={() => focusStationOnMap(station.id)}><MapPin size={16} /> Ver en mapa</button>
-                <a href={`https://www.google.com/maps/search/?api=1&query=${station.latE6 / 1_000_000},${station.lngE6 / 1_000_000}`} target="_blank" rel="noreferrer"><Navigation size={16} /> Cómo llegar</a>
+                <button onClick={() => setDirectionsStation(station)}><Navigation size={16} /> Cómo llegar</button>
                 <button onClick={() => { setRatingStation(ratingStation === station.id ? null : station.id); setRatingDimension("overall"); }}><Star size={16} /> Puntuar</button>
               </div>
               {ratingStation === station.id ? (
@@ -812,6 +821,21 @@ export default function StationExplorer({
         <button onClick={() => showToast(`${favorites.length} paradas guardadas`)}><Bookmark size={21} /><span>Guardadas</span></button>
         <button onClick={openLogin}><UserRound size={21} /><span>Perfil</span></button>
       </nav>
+
+      {directionsStation ? (
+        <div className="overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDirectionsStation(null); }}>
+          <section className="directions-sheet" role="dialog" aria-modal="true" aria-label={`Cómo llegar a ${directionsStation.name}`}>
+            <div className="sheet-grabber" />
+            <div className="modal-title"><div><span>ABRIR NAVEGACIÓN</span><h2>¿Con qué mapa?</h2></div><button onClick={() => setDirectionsStation(null)} aria-label="Cerrar"><X /></button></div>
+            <p><MapPin size={14} /> {directionsStation.name} · {directionsStation.municipality}</p>
+            <div className="directions-options">
+              <a href={`https://www.google.com/maps/dir/?api=1&destination=${directionsStation.latE6 / 1_000_000},${directionsStation.lngE6 / 1_000_000}&travelmode=driving`} target="_blank" rel="noreferrer" onClick={() => setDirectionsStation(null)}><span className="maps-logo google">G</span><div><strong>Google Maps</strong><small>Abrir ruta en coche</small></div><Navigation size={18} /></a>
+              <a href={`https://maps.apple.com/?daddr=${directionsStation.latE6 / 1_000_000},${directionsStation.lngE6 / 1_000_000}&dirflg=d`} target="_blank" rel="noreferrer" onClick={() => setDirectionsStation(null)}><span className="maps-logo apple">A</span><div><strong>Apple Maps</strong><small>Abrir ruta en coche</small></div><Navigation size={18} /></a>
+            </div>
+            <small className="directions-note">La navegación se abre fuera de Gasoliguapis con las coordenadas oficiales de la estación.</small>
+          </section>
+        </div>
+      ) : null}
 
       {confirmationStation ? (
         <div className="overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmationStation(null); }}>

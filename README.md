@@ -14,6 +14,8 @@ Aplicación móvil para encontrar la mejor parada en carretera por sentido, desv
 - Consulta por nombre, municipio o dirección antes de limitar resultados, total de coincidencias y hasta 100 estaciones por búsqueda.
 - Ordenación por precio o cercanía y carga progresiva en el dispositivo.
 - Mapa vectorial interactivo con todas las coincidencias cargadas, selección sincronizada con la lista y orden por precio, cercanía o puntuación.
+- Experiencia inmersiva con controles translúcidos, perspectiva 2D/3D y edificios extruidos cuando el nivel de zoom lo permite.
+- La estación seleccionada queda fijada al principio de la lista y puede abrirse en Google Maps o Apple Maps.
 - Filtros reales de baños, cafetería, restaurante y estaciones con valoraciones, además de GLP y AdBlue.
 - Propuesta automática de la parada con mejor equilibrio entre cercanía, precio y valoraciones disponibles cuando el usuario comparte su ubicación.
 - Snapshot estático compacto de GLP y AdBlue como respaldo gratuito si la base o la fuente oficial no responden durante una visita.

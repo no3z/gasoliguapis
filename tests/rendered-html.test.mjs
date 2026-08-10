@@ -25,7 +25,7 @@ test("server-renders the Gasoliguapis product", async () => {
   assert.match(html, /<title>Gasolineras en carretera: precios, GLP, AdBlue y servicios \| Gasoliguapis<\/title>/i);
   assert.match(html, /Encuentra tu/);
   assert.match(html, /CATÁLOGO OFICIAL · MITECO/);
-  assert.match(html, /Filtra el mapa por combustible/);
+  assert.match(html, /Combustible, servicios y puntuaciones/);
   assert.match(html, /Tu combustible/);
   assert.match(html, /Tiene GLP/);
   assert.match(html, /Tiene AdBlue/);
@@ -33,7 +33,7 @@ test("server-renders the Gasoliguapis product", async () => {
   assert.match(html, /Cerca de mí/);
   assert.match(html, /Más baratas/);
   assert.match(html, /Mejor puntuadas/);
-  assert.match(html, /RESULTADOS EN EL MAPA/);
+  assert.match(html, /MAPA NACIONAL DE PARADAS/);
   assert.match(html, /Cafetería/);
   assert.match(html, /calculadora-ahorro-combustible/);
   assert.doesNotMatch(html, /FICHA DE EJEMPLO|opiniones demo|Precios de muestra/);
@@ -116,9 +116,13 @@ test("connects the filtered station list to an interactive map", async () => {
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
   assert.match(packageJson, /maplibre-gl/);
-  assert.match(map, /tiles\.openfreemap\.org\/styles\/positron/);
+  assert.match(map, /tiles\.openfreemap\.org\/styles\/liberty/);
   assert.match(map, /flyTo/);
+  assert.match(map, /togglePerspective/);
   assert.match(explorer, /Ver en mapa/);
+  assert.match(explorer, /Google Maps/);
+  assert.match(explorer, /Apple Maps/);
+  assert.match(explorer, /orderedOfficialStations/);
   assert.match(explorer, /serviceFilters/);
   assert.match(stationsApi, /sortParam === "rating"/);
   assert.match(stationsApi, /restaurant_check\.latest_status/);
