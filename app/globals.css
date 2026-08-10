@@ -54,6 +54,11 @@ button, select { cursor: pointer; }
 .nearby-button { width: 100%; display: flex; align-items: center; justify-content: center; gap: 7px; height: 41px; margin-top: 3px; border: 0; border-radius: 11px; color: #fff; background: var(--ink); font-size: 11px; font-weight: 780; box-shadow: 0 6px 14px rgba(22,42,44,.15); }
 .nearby-button:active { transform: translateY(1px); }
 .nearby-button.active { background: var(--green); }.nearby-button:disabled { cursor: wait; opacity: .72; }
+.radius-picker { padding: 10px 3px 3px; }
+.radius-picker > span { display: block; margin: 0 2px 6px; color: #778383; font-size: 7px; font-weight: 850; letter-spacing: .9px; text-transform: uppercase; }
+.radius-picker > div { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
+.radius-picker button { min-width: 0; height: 29px; padding: 0 2px; border: 1px solid #dfddd6; border-radius: 8px; color: #687674; background: #fff; font-size: 8px; font-weight: 800; white-space: nowrap; }
+.radius-picker button.active { color: #fff; border-color: var(--green); background: var(--green); box-shadow: 0 4px 9px rgba(22,130,99,.2); }
 .fuel-picker { margin-top: 9px; padding: 7px; border: 1px solid rgba(22,42,44,.08); border-radius: 13px; background: rgba(255,253,249,.82); }
 .fuel-picker > span { display: block; margin: 0 3px 5px; color: #778383; font-size: 7px; font-weight: 850; letter-spacing: 1px; text-transform: uppercase; }
 .fuel-picker > div { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }

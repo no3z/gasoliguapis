@@ -100,6 +100,7 @@ const fuelOptions: { code: FuelCode; label: string; short: string }[] = [
   { code: "lpg", label: "GLP", short: "GLP" },
   { code: "adblue", label: "AdBlue", short: "AdBlue" },
 ];
+const radiusOptions = [10, 25, 50, 75, 100, 200] as const;
 const ratingOptions: { code: RatingDimension; label: string }[] = [
   { code: "overall", label: "Parada" },
   { code: "bathroom", label: "Baños" },
@@ -185,12 +186,14 @@ export default function StationExplorer({
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [mapBounds, setMapBounds] = useState<VisibleMapBounds | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
+  const [radiusKm, setRadiusKm] = useState(75);
   const [sort, setSort] = useState<SortMode>("price");
   const [fuel, setFuel] = useState<FuelCode>(initialFuel);
   const [requiredProducts, setRequiredProducts] = useState<ProductCode[]>([]);
   const [serviceFilters, setServiceFilters] = useState<ServiceFilter[]>([]);
   const [favorites, setFavorites] = useState<Array<number | string>>([]);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [mineOnly, setMineOnly] = useState(false);
   const [activeNav, setActiveNav] = useState<ActiveNav>("map");
   const [filterOpen, setFilterOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -221,7 +224,7 @@ export default function StationExplorer({
   const mapBoundsKey = mapBounds
     ? `${mapBounds.west.toFixed(4)},${mapBounds.south.toFixed(4)},${mapBounds.east.toFixed(4)},${mapBounds.north.toFixed(4)}`
     : "no-bounds";
-  const officialRequestKey = `${fuel}|${province}|${requiredProductsKey}|${serviceFiltersKey}|${searchTerm}|${locationKey}|${mapBoundsKey}|${sort}`;
+  const officialRequestKey = `${fuel}|${province}|${requiredProductsKey}|${serviceFiltersKey}|${searchTerm}|${locationKey}|${mapBoundsKey}|${radiusKm}|${sort}`;
   const officialLoading = (locationLoading && !location) || officialState.key !== officialRequestKey;
   const officialStations = useMemo(
     () => officialLoading ? [] : officialState.stations,
@@ -253,7 +256,7 @@ export default function StationExplorer({
     if (location) {
       params.set("lat", location.latitude.toFixed(4));
       params.set("lng", location.longitude.toFixed(4));
-      params.set("radiusKm", "75");
+      params.set("radiusKm", String(radiusKm));
     }
     if (mapBounds) params.set("bounds", mapBoundsKey);
     requiredProductsKey.split(",").filter(Boolean).forEach((product) => params.append("requires", product));
@@ -321,7 +324,7 @@ export default function StationExplorer({
                 };
               })
               .filter(() => serviceFiltersKey.length === 0)
-              .filter((station) => !location || mapBounds || Number(station.distanceKm) <= 75)
+              .filter((station) => !location || mapBounds || Number(station.distanceKm) <= radiusKm)
               .sort((left, right) => sort === "distance"
                 ? Number(left.distanceKm) - Number(right.distanceKm)
                 : sort === "rating"
@@ -341,12 +344,12 @@ export default function StationExplorer({
         });
       });
     return () => controller.abort();
-  }, [fuel, location, locationLoading, mapBounds, mapBoundsKey, officialRequestKey, province, requiredProductsKey, searchTerm, serviceFiltersKey, sort]);
+  }, [fuel, location, locationLoading, mapBounds, mapBoundsKey, officialRequestKey, province, radiusKm, requiredProductsKey, searchTerm, serviceFiltersKey, sort]);
 
-  const filteredOfficialStations = useMemo(
-    () => favoritesOnly ? officialStations.filter((station) => favorites.includes(station.id)) : officialStations,
-    [favorites, favoritesOnly, officialStations],
-  );
+  const filteredOfficialStations = useMemo(() => officialStations
+    .filter((station) => !favoritesOnly || favorites.includes(station.id))
+    .filter((station) => !mineOnly || Boolean(personalRatings[station.id])),
+  [favorites, favoritesOnly, mineOnly, officialStations, personalRatings]);
   const orderedOfficialStations = useMemo(() => {
     if (!selectedStationId) return filteredOfficialStations;
     const selected = filteredOfficialStations.find((station) => station.id === selectedStationId);
@@ -371,7 +374,7 @@ export default function StationExplorer({
     if (!location || officialStations.length === 0) return null;
     const candidates = officialStations.slice(0, 40);
     const prices = candidates.map((station) => station.priceMicros);
-    const distances = candidates.map((station) => Number(station.distanceKm ?? 75));
+    const distances = candidates.map((station) => Number(station.distanceKm ?? radiusKm));
     const minPrice = Math.min(...prices);
     const maxPrice = Math.max(...prices);
     const maxDistance = Math.max(...distances, 1);
@@ -385,7 +388,7 @@ export default function StationExplorer({
       const distanceScore = 1 - Math.min(Number(station.distanceKm ?? maxDistance), maxDistance) / maxDistance;
       return { id: station.id, score: distanceScore * .5 + priceScore * .35 + serviceScore * .15 };
     }).sort((left, right) => right.score - left.score)[0]?.id ?? null;
-  }, [location, officialStations]);
+  }, [location, officialStations, radiusKm]);
   const recommendedStation = recommendedStationId
     ? officialStations.find((station) => station.id === recommendedStationId) ?? null
     : null;
@@ -402,6 +405,7 @@ export default function StationExplorer({
     setProvince("");
     setSelectedStationId(null);
     setFavoritesOnly(false);
+    setMineOnly(false);
     setShowCount(20);
     setActiveNav("map");
     showToast("Buscando en toda el área visible");
@@ -409,18 +413,21 @@ export default function StationExplorer({
 
   const showMap = () => {
     setFavoritesOnly(false);
+    setMineOnly(false);
     setActiveNav("map");
     scrollToSection("mapa");
   };
 
   const showSearch = () => {
     setFavoritesOnly(false);
+    setMineOnly(false);
     setActiveNav("search");
     scrollToSection("buscar");
   };
 
   const showSavedStations = () => {
     setFavoritesOnly(true);
+    setMineOnly(false);
     setSelectedStationId(null);
     setShowCount(20);
     setActiveNav("saved");
@@ -466,6 +473,26 @@ export default function StationExplorer({
     });
   };
 
+  const selectRadius = (nextRadius: number) => {
+    setRadiusKm(nextRadius);
+    setMapBounds(null);
+    setProvince("");
+    setSelectedStationId(null);
+    setShowCount(20);
+    if (!location && !locationLoading) requestMyLocation();
+  };
+
+  const toggleMineOnly = () => {
+    if (!sessionUser.signedIn) {
+      void openLogin();
+      return;
+    }
+    setMineOnly((current) => !current);
+    setFavoritesOnly(false);
+    setSelectedStationId(null);
+    setShowCount(20);
+  };
+
   const showToast = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 2600);
@@ -497,15 +524,17 @@ export default function StationExplorer({
     setProvince("");
     setLocation(null);
     setMapBounds(null);
+    setRadiusKm(75);
     setSort("price");
     setRequiredProducts([]);
     setServiceFilters([]);
     setFuel(initialFuel);
     setFavoritesOnly(false);
+    setMineOnly(false);
     setShowCount(20);
   };
 
-  const useMyLocation = () => {
+  const requestMyLocation = () => {
     if (!navigator.geolocation) {
       showToast("Tu navegador no permite usar la ubicación");
       return;
@@ -522,7 +551,7 @@ export default function StationExplorer({
         setSort("distance");
         setShowCount(20);
         setLocationLoading(false);
-        showToast("Mostrando estaciones a menos de 75 km");
+        showToast(`Mostrando estaciones a menos de ${radiusKm} km`);
       },
       () => {
         setLocationLoading(false);
@@ -782,11 +811,12 @@ export default function StationExplorer({
             loading={officialLoading}
             fuelLabel={selectedFuel.label}
             personalRatings={personalRatings}
+            radiusKm={radiusKm}
             lockViewport={Boolean(mapBounds)}
             onSelect={(stationId) => { setSelectedStationId(stationId); setActiveNav("map"); }}
             onOpenList={openStationInList}
             onDirections={openDirections}
-            onRequestLocation={useMyLocation}
+            onRequestLocation={requestMyLocation}
             onSearchVisibleArea={searchVisibleMapArea}
           />
         </div>
@@ -811,6 +841,7 @@ export default function StationExplorer({
                   setLocation(null);
                   setMapBounds(null);
                   setFavoritesOnly(false);
+                  setMineOnly(false);
                   setSort("price");
                   setShowCount(20);
                 }}
@@ -831,9 +862,13 @@ export default function StationExplorer({
             </div>
             {query ? <button aria-label="Limpiar búsqueda" onClick={() => setQuery("")}><X size={17} /></button> : null}
           </div>
-          <button className={`nearby-button ${location ? "active" : ""}`} onClick={useMyLocation} disabled={locationLoading}>
-            <LocateFixed size={18} /> {locationLoading ? "Cerca de mí · localizando…" : location ? "A menos de 75 km" : "Cerca de mí"}
+          <button className={`nearby-button ${location ? "active" : ""}`} onClick={requestMyLocation} disabled={locationLoading}>
+            <LocateFixed size={18} /> {locationLoading ? "Cerca de mí · localizando…" : location ? `A menos de ${radiusKm} km` : "Cerca de mí"}
           </button>
+          <div className="radius-picker" aria-label="Radio de búsqueda desde tu ubicación">
+            <span>Radio desde mí</span>
+            <div>{radiusOptions.map((option) => <button className={radiusKm === option ? "active" : ""} aria-pressed={radiusKm === option} key={option} onClick={() => selectRadius(option)}>{option} km</button>)}</div>
+          </div>
           </div>
 
           <div className="fuel-picker" aria-label="Selecciona tu combustible">
@@ -853,7 +888,7 @@ export default function StationExplorer({
           </div>
 
           {(fuel === "lpg" || fuel === "adblue") && !location ? (
-            <button className="glp-now" onClick={useMyLocation} disabled={locationLoading}>
+            <button className="glp-now" onClick={requestMyLocation} disabled={locationLoading}>
               <span><b>{fuel === "lpg" ? "GLP AHORA" : "ADBLUE AHORA"}</b><strong>Encuentra puntos confirmados cerca de ti</strong><small>Usamos una ubicación aproximada y no la guardamos.</small></span>
               {fuel === "adblue" ? <Droplets size={21} /> : <LocateFixed size={21} />}
             </button>
@@ -882,21 +917,21 @@ export default function StationExplorer({
       <section className="results-section" id="explorar">
         <div className="results-head">
           <div>
-            <span className="result-kicker">{favoritesOnly ? "GUARDADAS EN ESTE DISPOSITIVO" : mapBounds ? "ÁREA VISIBLE · MITECO" : "CATÁLOGO OFICIAL · MITECO"}</span>
-            <h2>{officialLoading ? "Buscando paradas…" : favoritesOnly ? `${filteredOfficialStations.length.toLocaleString("es-ES")} guardadas en estos resultados` : `${officialTotal.toLocaleString("es-ES")} con ${selectedFuel.label}`}</h2>
+            <span className="result-kicker">{favoritesOnly ? "GUARDADAS EN ESTE DISPOSITIVO" : mineOnly ? "VALORADAS POR TI" : mapBounds ? "ÁREA VISIBLE · MITECO" : "CATÁLOGO OFICIAL · MITECO"}</span>
+            <h2>{officialLoading ? "Buscando paradas…" : favoritesOnly ? `${filteredOfficialStations.length.toLocaleString("es-ES")} guardadas en estos resultados` : mineOnly ? `${filteredOfficialStations.length.toLocaleString("es-ES")} puntuadas por ti` : `${officialTotal.toLocaleString("es-ES")} con ${selectedFuel.label}`}</h2>
           </div>
           <label className="result-sort"><ListFilter size={14} /><select value={selectedStationId ? "selected" : sort} onChange={(event) => { setSelectedStationId(null); setSort(event.target.value as SortMode); setShowCount(20); }} aria-label="Ordenar resultados">{selectedStationId ? <option value="selected">Seleccionada + cercanas</option> : null}<option value="price">Más baratas</option><option value="rating">Mejor puntuadas</option><option value="distance" disabled={!location}>Más cercanas</option></select></label>
         </div>
 
-        <p className="official-context"><ShieldCheck size={14} /> {favoritesOnly ? "Tus guardadas se conservan en este dispositivo y respetan los filtros actuales." : mapBounds ? "Estaciones dentro del rectángulo visible del mapa; mueve el mapa para buscar en otra zona." : location ? "Estaciones en un radio de 75 km; la distancia es en línea recta." : province ? `Resultados oficiales en ${provinceLabel}.` : "Búsqueda nacional en toda España."} Precio y disponibilidad procedentes de MITECO.</p>
+        <p className="official-context"><ShieldCheck size={14} /> {favoritesOnly ? "Tus guardadas se conservan en este dispositivo y respetan los filtros actuales." : mineOnly ? "Mostramos únicamente las estaciones a las que ya has dado una nota general." : mapBounds ? "Estaciones dentro del rectángulo visible del mapa; mueve el mapa para buscar en otra zona." : location ? `Estaciones en un radio de ${radiusKm} km; la distancia es en línea recta.` : province ? `Resultados oficiales en ${provinceLabel}.` : "Búsqueda nacional en toda España."} Precio y disponibilidad procedentes de MITECO.</p>
 
         {officialError ? <div className="official-message error"><X size={18} /> {officialError}</div> : null}
         {!officialLoading && !officialError && visibleOfficialStations.length === 0 ? (
-          <div className="official-message"><Fuel size={19} /><div><strong>{favoritesOnly ? "No tienes paradas guardadas en estos resultados" : "Aún no aparecen estaciones con estos criterios"}</strong><span>{favoritesOnly ? "Vuelve a explorar y toca el corazón de una estación para guardarla." : "Prueba otra búsqueda, quita GLP o AdBlue, o cambia de tramo."}</span><button onClick={favoritesOnly ? showSearch : clearFilters}>{favoritesOnly ? "Volver a buscar" : "Limpiar filtros"}</button></div></div>
+          <div className="official-message"><Fuel size={19} /><div><strong>{favoritesOnly ? "No tienes paradas guardadas en estos resultados" : mineOnly ? "Aún no has puntuado estaciones con estos filtros" : "Aún no aparecen estaciones con estos criterios"}</strong><span>{favoritesOnly ? "Vuelve a explorar y toca el corazón de una estación para guardarla." : mineOnly ? "Puntúa una parada y aparecerá aquí automáticamente." : "Prueba otra búsqueda, quita GLP o AdBlue, o amplía el radio."}</span><button onClick={favoritesOnly || mineOnly ? showSearch : clearFilters}>{favoritesOnly || mineOnly ? "Volver a buscar" : "Limpiar filtros"}</button></div></div>
         ) : null}
         {officialLoading ? <div className="official-loading"><span /><span /><span /></div> : null}
 
-        {recommendedStation && !officialLoading && !favoritesOnly && !mapBounds ? (
+        {recommendedStation && !officialLoading && !favoritesOnly && !mineOnly && !mapBounds ? (
           <div className="recommendation-card">
             <Sparkles size={19} />
             <div><span>NUESTRA PROPUESTA CERCA DE TI</span><strong>{recommendedStation.name}</strong><small>{Number(recommendedStation.distanceKm).toFixed(1)} km · {formatPrice(recommendedStation.priceMicros)} · equilibrio entre cercanía, precio y valoraciones disponibles</small></div>
@@ -965,7 +1000,7 @@ export default function StationExplorer({
         {!officialLoading && showCount < filteredOfficialStations.length ? (
           <button className="load-more" onClick={() => setShowCount((current) => current + 20)}>Ver 20 estaciones más</button>
         ) : null}
-        {!officialLoading && !favoritesOnly && officialTotal > officialStations.length ? <p className="result-limit">Mostramos las 100 mejores coincidencias. Usa provincia, búsqueda o cercanía para afinar.</p> : null}
+        {!officialLoading && !favoritesOnly && !mineOnly && officialTotal > officialStations.length ? <p className="result-limit">Mostramos las 100 mejores coincidencias. Usa provincia, búsqueda o cercanía para afinar.</p> : null}
 
         <aside className="trust-strip">
           <ShieldCheck size={18} />
@@ -1023,7 +1058,7 @@ export default function StationExplorer({
             <div className={`proximity-box ${location ? "ready" : ""}`}>
               <LocateFixed size={18} />
               <div><strong>{location ? "Cercanía lista para comprobar" : "Haz más fiable tu aviso"}</strong><span>{location ? "El servidor comprueba que estás cerca y descarta inmediatamente las coordenadas." : "Podemos comprobar que estás cerca. Tu ubicación no se guarda."}</span></div>
-              {!location ? <button onClick={useMyLocation} disabled={locationLoading}>{locationLoading ? "…" : "Comprobar"}</button> : null}
+              {!location ? <button onClick={requestMyLocation} disabled={locationLoading}>{locationLoading ? "…" : "Comprobar"}</button> : null}
             </div>
             <small className="confirmation-note"><ShieldCheck size={13} /> La confirmación es temporal y nunca sustituye el dato oficial de MITECO.</small>
           </section>
@@ -1044,7 +1079,7 @@ export default function StationExplorer({
                 { code: "restaurant" as const, label: "Restaurante confirmado" },
                 { code: "rated" as const, label: "Con puntuaciones" },
               ].map((item) => <button className={serviceFilters.includes(item.code) ? "selected" : ""} aria-pressed={serviceFilters.includes(item.code)} key={item.code} onClick={() => toggleServiceFilter(item.code)}><span>{item.label}</span><Check size={16} /></button>)}
-              {["Abierto 24 h", "Duchas"].map((item) => <button key={item} disabled title="Disponible cuando completemos esta fuente"><span>{item}</span><small>pronto</small></button>)}
+              <button className={mineOnly ? "selected" : ""} aria-pressed={mineOnly} onClick={toggleMineOnly}><span>Valoradas por mí</span><Check size={16} /></button>
             </div>
             <button className="primary-action" onClick={() => { setFilterOpen(false); showToast("Filtros aplicados"); }}>Ver paradas</button>
           </section>

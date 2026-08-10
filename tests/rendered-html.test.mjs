@@ -143,7 +143,12 @@ test("connects the filtered station list to an interactive map", async () => {
   assert.match(explorer, /gasoliguapis:favorites/);
   assert.match(explorer, /GUARDADAS EN ESTE DISPOSITIVO/);
   assert.match(explorer, /Confirmar datos/);
+  assert.match(explorer, /radiusOptions/);
+  assert.match(explorer, /Radio desde mí/);
+  assert.match(explorer, /Valoradas por mí/);
+  assert.doesNotMatch(explorer, /Abierto 24 h.*pronto|Duchas.*pronto/);
   assert.match(map, /map-marker-user-rating/);
+  assert.match(map, /radiusKm/);
   assert.match(css, /rating-low/);
   assert.match(css, /rating-mid/);
   assert.match(css, /rating-high/);
