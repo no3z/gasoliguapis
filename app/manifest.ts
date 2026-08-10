@@ -13,8 +13,8 @@ export default function manifest(): MetadataRoute.Manifest {
     categories: ["travel", "navigation", "utilities"],
     icons: [{ src: "/favicon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" }],
     shortcuts: [
-      { name: "Buscar GLP", short_name: "GLP", url: "/gasolineras-con-glp" },
-      { name: "Buscar AdBlue", short_name: "AdBlue", url: "/gasolineras-con-adblue" },
+      { name: "Buscar GLP", short_name: "GLP", url: "/buscar/glp" },
+      { name: "Buscar AdBlue", short_name: "AdBlue", url: "/buscar/adblue" },
       { name: "Calcular ahorro", short_name: "Ahorro", url: "/calculadora-ahorro-combustible" },
     ],
   };

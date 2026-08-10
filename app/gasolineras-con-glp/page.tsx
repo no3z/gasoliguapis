@@ -27,7 +27,7 @@ export default function GlpGuide() {
         <h2>Una búsqueda basada en disponibilidad confirmada</h2>
         <p>Gasoliguapis utiliza el precio comunicado al Ministerio para confirmar que una estación ofrece GLP. En la consulta realizada el {DATA_SNAPSHOT_DATE}, el conjunto oficial contenía 1.000 estaciones con precio de GLP.</p>
         <p>El precio y la fecha de observación aparecen juntos. Así puedes distinguir un dato oficial reciente de una recomendación de la comunidad y evitar listados donde no está claro cuándo se comprobó por última vez.</p>
-        <Link className="guide-cta" href="/#explorar">Buscar una estación con GLP</Link>
+        <Link className="guide-cta" href="/buscar/glp#explorar">Abrir el buscador nacional de GLP</Link>
       </section>
 
       <section className="guide-grid">

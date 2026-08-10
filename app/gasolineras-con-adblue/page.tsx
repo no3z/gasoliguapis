@@ -23,7 +23,7 @@ export default function AdblueGuide() {
         <h2>“Sin dato” no significa “no disponible”</h2>
         <p>La remisión del precio de AdBlue es voluntaria. Por eso interpretamos un precio oficial como disponibilidad confirmada, pero no convertimos una casilla vacía en un “no vende AdBlue”. Puede que la estación lo ofrezca sin haber comunicado el precio.</p>
         <p>La solución es conservar tres estados: confirmado por fuente oficial, confirmado recientemente por la comunidad o el propietario, y desconocido. La interfaz no mezcla esos niveles de confianza.</p>
-        <Link className="guide-cta" href="/#explorar">Buscar AdBlue en el mapa</Link>
+        <Link className="guide-cta" href="/buscar/adblue#explorar">Abrir el buscador nacional de AdBlue</Link>
       </section>
 
       <section className="guide-grid">

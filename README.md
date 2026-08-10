@@ -10,6 +10,11 @@ Aplicación móvil para encontrar la mejor parada en carretera por sentido, desv
 - Ingesta paginada y protegida del censo/precios oficiales de MITECO, con un único snapshot por ciclo en R2 y escrituras D1 solo cuando cambia un dato.
 - Respuestas oficiales cacheables en CDN durante 30 minutos y tolerantes a caídas temporales del proveedor.
 - Filtros oficiales por Gasóleo A, Gasolina 95, GLP y AdBlue, con requisitos combinables GLP + AdBlue.
+- Búsqueda real en toda España, las 52 provincias o un radio de 75 km usando ubicación aproximada.
+- Consulta por nombre, municipio o dirección antes de limitar resultados, total de coincidencias y hasta 100 estaciones por búsqueda.
+- Ordenación por precio o cercanía y carga progresiva en el dispositivo.
+- Snapshot estático compacto de GLP y AdBlue como respaldo gratuito si la base o la fuente oficial no responden durante una visita.
+- Valoraciones separadas de parada, baños, café y limpieza; no se mezclan en una única nota genérica.
 - Votos 1–5 autenticados con la identidad disponible en Sites; el esquema conserva soporte multi-proveedor para Google/Facebook.
 - Google/Facebook no simulan un acceso real hasta confirmar callbacks y configurar credenciales compatibles.
 - Portada cacheable sin consulta de identidad; la sesión se comprueba únicamente al abrir el perfil o escribir.
@@ -34,4 +39,4 @@ Las variables locales se documentan en `.env.example`. Los secretos alojados se 
 
 Para que los buscadores puedan indexar las páginas, el Site debe tener acceso público. Mientras siga protegido por inicio de sesión, Google recibirá un `401` aunque `robots.txt` y el sitemap estén preparados.
 
-La investigación, licencias, estrategia de cobertura, comunidad y monetización se encuentran en `docs/product-data-strategy.md`.
+La investigación, licencias, estrategia de cobertura, comunidad y monetización se encuentran en `docs/product-data-strategy.md`. El estudio competitivo especializado en GLP y AdBlue está en `docs/market-study-glp-2026.md`.

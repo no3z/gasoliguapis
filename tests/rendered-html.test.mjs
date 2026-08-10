@@ -29,9 +29,21 @@ test("server-renders the Gasoliguapis product", async () => {
   assert.match(html, /Tu combustible/);
   assert.match(html, /Tiene GLP/);
   assert.match(html, /Tiene AdBlue/);
+  assert.match(html, /Toda España/);
+  assert.match(html, /Cerca de mí/);
+  assert.match(html, /Más baratas/);
   assert.match(html, /calculadora-ahorro-combustible/);
   assert.doesNotMatch(html, /FICHA DE EJEMPLO|opiniones demo|Precios de muestra/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);
+});
+
+test("opens a dedicated national GLP search without falling back to diesel", async () => {
+  const response = await render("/buscar/glp");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Buscador nacional de gasolineras con GLP/);
+  assert.match(html, /aria-pressed="true"[^>]*>[^<]*(?:<[^>]+>)*GLP/i);
+  assert.match(html, /Búsqueda nacional en toda España/);
 });
 
 test("renders useful indexable GLP and savings pages", async () => {
@@ -67,4 +79,13 @@ test("keeps product metadata and removes the disposable starter", async () => {
   await access(new URL("../app/sitemap.ts", import.meta.url));
   await access(new URL("../app/manifest.ts", import.meta.url));
   await access(new URL(".openai/drizzle/0000_right_newton_destine.sql", templateRoot));
+});
+
+test("ships a compact official fallback for special fuels", async () => {
+  const snapshot = JSON.parse(await readFile(new URL("../public/data/miteco-special-fuels.json", import.meta.url), "utf8"));
+  assert.equal(snapshot.source, "MITECO");
+  assert.equal(snapshot.products.lpg.length, 1000);
+  assert.ok(snapshot.products.adblue.length >= 2900);
+  assert.match(snapshot.products.lpg[0].id, /^miteco:/);
+  assert.ok(snapshot.products.lpg.every((station) => Number.isInteger(station.priceMicros) && station.priceMicros > 0));
 });

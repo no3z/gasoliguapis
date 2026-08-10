@@ -28,9 +28,23 @@ function decimal(value?: string) {
 
 function officialTimestamp(value?: string) {
   const match = value?.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})/);
-  return match
-    ? Date.UTC(Number(match[3]), Number(match[2]) - 1, Number(match[1]), Number(match[4]), Number(match[5]), Number(match[6]))
-    : Date.now();
+  if (!match) return Date.now();
+  const targetUtc = Date.UTC(Number(match[3]), Number(match[2]) - 1, Number(match[1]), Number(match[4]), Number(match[5]), Number(match[6]));
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
+  }).formatToParts(new Date(targetUtc)).filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  const madridAtTarget = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour), Number(parts.minute), Number(parts.second));
+  return targetUtc - (madridAtTarget - targetUtc);
+}
+
+function haversineKm(latA: number, lngA: number, latB: number, lngB: number) {
+  const radians = (value: number) => value * Math.PI / 180;
+  const latDistance = radians(latB - latA);
+  const lngDistance = radians(lngB - lngA);
+  const a = Math.sin(latDistance / 2) ** 2
+    + Math.cos(radians(latA)) * Math.cos(radians(latB)) * Math.sin(lngDistance / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 export async function GET(request: Request) {
@@ -38,6 +52,15 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const province = url.searchParams.get("province")?.trim();
   const fuel = url.searchParams.get("fuel")?.trim() || "diesel_a";
+  const query = url.searchParams.get("q")?.trim().slice(0, 80) || "";
+  const requestedSort = url.searchParams.get("sort") === "distance" ? "distance" : "price";
+  const latitude = Number(url.searchParams.get("lat"));
+  const longitude = Number(url.searchParams.get("lng"));
+  const hasLocation = Number.isFinite(latitude) && latitude >= 35 && latitude <= 44.5
+    && Number.isFinite(longitude) && longitude >= -10 && longitude <= 5;
+  const requestedRadius = Number(url.searchParams.get("radiusKm") || 75);
+  const radiusKm = Number.isFinite(requestedRadius) ? Math.min(250, Math.max(5, requestedRadius)) : 75;
+  const sort = requestedSort === "distance" && hasLocation ? "distance" : "price";
   const required = url.searchParams.getAll("requires").filter((item) => item === "lpg" || item === "adblue");
   const requestedLimit = Number(url.searchParams.get("limit") || 30);
   const limit = Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, Math.floor(requestedLimit))) : 30;
@@ -46,15 +69,42 @@ export async function GET(request: Request) {
   }
   const requiresLpg = required.includes("lpg") ? 1 : 0;
   const requiresAdblue = required.includes("adblue") ? 1 : 0;
+  const queryLike = query ? `%${query.toLocaleLowerCase("es")}%` : null;
+  const latDelta = hasLocation ? radiusKm / 111 : 0;
+  const lngDelta = hasLocation ? radiusKm / (111 * Math.max(0.2, Math.cos(latitude * Math.PI / 180))) : 0;
+  const targetLatE6 = Math.round(latitude * 1_000_000);
+  const targetLngE6 = Math.round(longitude * 1_000_000);
+  const locationClause = hasLocation ? "AND s.lat_e6 BETWEEN ? AND ? AND s.lng_e6 BETWEEN ? AND ?" : "";
+  const orderClause = sort === "distance"
+    ? "ORDER BY ABS(s.lat_e6 - ?) + ABS(s.lng_e6 - ?) ASC, p.price_micros ASC"
+    : "ORDER BY p.price_micros ASC, s.name ASC";
 
   let data: Array<Record<string, unknown>> = [];
+  let total = 0;
+  let databaseInitialized = false;
   try {
+    const values: unknown[] = [fuel, province || null, province || null, queryLike, queryLike, requiresLpg, requiresAdblue];
+    if (hasLocation) values.push(
+      Math.round((latitude - latDelta) * 1_000_000),
+      Math.round((latitude + latDelta) * 1_000_000),
+      Math.round((longitude - lngDelta) * 1_000_000),
+      Math.round((longitude + lngDelta) * 1_000_000),
+    );
+    if (sort === "distance") values.push(targetLatE6, targetLngE6);
+    values.push(limit);
     const rows = await database.prepare(`SELECT
       s.id, s.name, s.brand, s.address, s.municipality, s.province,
       s.lat_e6 AS latE6, s.lng_e6 AS lngE6,
       p.price_micros AS priceMicros, p.currency, COALESCE(ds.updated_at, p.observed_at) AS priceObservedAt,
       lpg.price_micros AS lpgPriceMicros, COALESCE(ds.updated_at, lpg.observed_at) AS lpgObservedAt,
-      adblue.price_micros AS adbluePriceMicros, COALESCE(ds.updated_at, adblue.observed_at) AS adblueObservedAt
+      adblue.price_micros AS adbluePriceMicros, COALESCE(ds.updated_at, adblue.observed_at) AS adblueObservedAt,
+      (SELECT ROUND(AVG(sr.value), 1) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'bathroom') AS bathroomRating,
+      (SELECT COUNT(*) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'bathroom') AS bathroomCount,
+      (SELECT ROUND(AVG(sr.value), 1) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'coffee') AS coffeeRating,
+      (SELECT COUNT(*) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'coffee') AS coffeeCount,
+      (SELECT ROUND(AVG(sr.value), 1) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'cleanliness') AS cleanlinessRating,
+      (SELECT COUNT(*) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'cleanliness') AS cleanlinessCount,
+      COUNT(*) OVER() AS totalMatches
     FROM stations s
     INNER JOIN station_current_prices p
       ON p.station_id = s.id AND p.fuel_type_id = ?
@@ -65,18 +115,32 @@ export async function GET(request: Request) {
     LEFT JOIN data_sources ds ON ds.id = 'miteco-prices'
     WHERE s.status = 'active'
       AND (? IS NULL OR lower(s.province) = lower(?))
+      AND (? IS NULL OR lower(coalesce(s.name, '') || ' ' || coalesce(s.brand, '') || ' ' || coalesce(s.address, '') || ' ' || coalesce(s.municipality, '') || ' ' || coalesce(s.province, '')) LIKE ?)
       AND (? = 0 OR lpg.station_id IS NOT NULL)
       AND (? = 0 OR adblue.station_id IS NOT NULL)
-    ORDER BY p.price_micros ASC, s.name ASC
-    LIMIT ?`).bind(fuel, province || null, province || null, requiresLpg, requiresAdblue, limit).all<Record<string, unknown>>();
-    data = rows.results || [];
+      ${locationClause}
+    ${orderClause}
+    LIMIT ?`).bind(...values).all<Record<string, unknown>>();
+    const rawRows = rows.results || [];
+    total = Number(rawRows[0]?.totalMatches || 0);
+    data = rawRows
+      .map((station) => hasLocation ? {
+        ...station,
+        distanceKm: haversineKm(latitude, longitude, Number(station.latE6) / 1_000_000, Number(station.lngE6) / 1_000_000),
+      } : station)
+      .filter((station) => !hasLocation || Number(station.distanceKm) <= radiusKm);
+    if (data.length > 0) databaseInitialized = true;
+    else {
+      const source = await database.prepare("SELECT id FROM data_sources WHERE id = 'miteco-prices' LIMIT 1").all<{ id: string }>();
+      databaseInitialized = Boolean(source.results?.length);
+    }
   } catch {
     // Local previews can start before migrations are applied. The official
     // live feed below keeps the read experience useful in that state.
   }
 
   let delivery = "database";
-  if (data.length === 0) {
+  if (data.length === 0 && !databaseInitialized) {
     try {
       type ProductPayload = { Fecha?: string; ListaEESSPrecio?: Array<Record<string, string>> };
       const productIds = [...new Set([PRODUCT_IDS[fuel], PRODUCT_IDS.lpg, PRODUCT_IDS.adblue])];
@@ -97,8 +161,10 @@ export async function GET(request: Request) {
       const adblueObservedAt = officialTimestamp(adbluePayload.Fecha);
       const lpgByStation = new Map((lpgPayload.ListaEESSPrecio || []).map((station) => [station.IDEESS, decimal(station.PrecioProducto)]));
       const adblueByStation = new Map((adbluePayload.ListaEESSPrecio || []).map((station) => [station.IDEESS, decimal(station.PrecioProducto)]));
-      data = (selectedPayload.ListaEESSPrecio || [])
+      const matches = (selectedPayload.ListaEESSPrecio || [])
         .filter((station) => !province || station.Provincia?.toLocaleLowerCase("es") === province.toLocaleLowerCase("es"))
+        .filter((station) => !query || [station.Rótulo, station.Dirección, station.Municipio, station.Provincia]
+          .filter(Boolean).join(" ").toLocaleLowerCase("es").includes(query.toLocaleLowerCase("es")))
         .filter((station) => !requiresLpg || lpgByStation.has(station.IDEESS))
         .filter((station) => !requiresAdblue || adblueByStation.has(station.IDEESS))
         .map((station) => {
@@ -123,10 +189,21 @@ export async function GET(request: Request) {
             lpgObservedAt: lpgPrice === null ? null : lpgObservedAt,
             adbluePriceMicros: adbluePrice === null ? null : Math.round(adbluePrice * 1_000_000),
             adblueObservedAt: adbluePrice === null ? null : adblueObservedAt,
+            bathroomRating: null,
+            bathroomCount: 0,
+            coffeeRating: null,
+            coffeeCount: 0,
+            cleanlinessRating: null,
+            cleanlinessCount: 0,
+            distanceKm: hasLocation ? haversineKm(latitude, longitude, lat, lng) : null,
           };
         })
-        .sort((a, b) => a.priceMicros - b.priceMicros)
-        .slice(0, limit);
+        .filter((station) => !hasLocation || Number(station.distanceKm) <= radiusKm)
+        .sort((a, b) => sort === "distance"
+          ? Number(a.distanceKm) - Number(b.distanceKm)
+          : a.priceMicros - b.priceMicros);
+      total = matches.length;
+      data = matches.slice(0, limit);
       delivery = "live-fallback";
     } catch {
       return Response.json({ error: "No se pudo consultar ahora la fuente oficial" }, { status: 502 });
@@ -137,6 +214,9 @@ export async function GET(request: Request) {
     kind: "official",
     source: "MITECO",
     delivery,
+    total,
+    scope: hasLocation ? { kind: "nearby", radiusKm, latitude, longitude } : province ? { kind: "province", province } : { kind: "national" },
+    sort,
     data,
     attribution: "Origen de los datos: Ministerio para la Transición Ecológica y el Reto Demográfico",
   }, { headers: { "cache-control": "public, max-age=300, s-maxage=1800, stale-while-revalidate=86400, stale-if-error=86400" } });
