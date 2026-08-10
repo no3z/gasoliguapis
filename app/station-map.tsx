@@ -39,7 +39,7 @@ type Props = {
   onRequestLocation: () => void;
 };
 
-const SPAIN_BOUNDS: [[number, number], [number, number]] = [[-9.7, 35.7], [4.5, 43.9]];
+const SPAIN_BOUNDS: [[number, number], [number, number]] = [[-18.5, 27.4], [4.5, 43.9]];
 
 function formatPrice(micros: number) {
   return `${(micros / 1_000_000).toLocaleString("es-ES", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} €`;
@@ -53,13 +53,21 @@ export default function StationMap({ stations, selectedId, userLocation, loading
   const onSelectRef = useRef(onSelect);
   const [ready, setReady] = useState(false);
   const [mapError, setMapError] = useState(false);
-  const [perspective, setPerspective] = useState(true);
+  const [perspective, setPerspective] = useState(false);
   const [mapAttempt, setMapAttempt] = useState(0);
 
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
+  const mappableStations = useMemo(
+    () => stations.filter((station) => {
+      const latitude = station.latE6 / 1_000_000;
+      const longitude = station.lngE6 / 1_000_000;
+      return latitude >= 27 && latitude <= 44.5 && longitude >= -19 && longitude <= 5;
+    }),
+    [stations],
+  );
   const selectedStation = useMemo(
-    () => stations.find((station) => station.id === selectedId) ?? null,
-    [selectedId, stations],
+    () => mappableStations.find((station) => station.id === selectedId) ?? null,
+    [mappableStations, selectedId],
   );
 
   useEffect(() => {
@@ -73,10 +81,11 @@ export default function StationMap({ stations, selectedId, userLocation, loading
         style: "https://tiles.openfreemap.org/styles/liberty",
         center: [-3.7, 40.2],
         zoom: 4.6,
-        pitch: 38,
-        bearing: -8,
+        pitch: 0,
+        bearing: 0,
         minZoom: 3,
         maxZoom: 17,
+        cooperativeGestures: true,
       });
       mapRef.current = map;
       loadTimer = setTimeout(() => {
@@ -105,7 +114,7 @@ export default function StationMap({ stations, selectedId, userLocation, loading
     import("maplibre-gl").then((maplibre) => {
       if (!active || mapRef.current !== map) return;
       markersRef.current.forEach((marker) => marker.remove());
-      markersRef.current = stations.map((station) => {
+      markersRef.current = mappableStations.map((station) => {
         const markerButton = document.createElement("button");
         markerButton.type = "button";
         markerButton.className = `map-station-marker${station.id === selectedId ? " selected" : ""}`;
@@ -115,28 +124,38 @@ export default function StationMap({ stations, selectedId, userLocation, loading
         priceLabel.textContent = formatPrice(station.priceMicros).replace(" €", "");
         markerButton.appendChild(priceLabel);
         markerButton.addEventListener("click", () => onSelectRef.current(station.id));
-        return new maplibre.Marker({ element: markerButton, anchor: "bottom" })
+        return new maplibre.Marker({ element: markerButton, anchor: "bottom", offset: [0, -7] })
           .setLngLat([station.lngE6 / 1_000_000, station.latE6 / 1_000_000])
           .addTo(map);
       });
     });
     return () => { active = false; };
-  }, [ready, selectedId, stations]);
+  }, [mappableStations, ready, selectedId]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
-    if (stations.length === 0) {
+    if (userLocation) {
+      map.flyTo({
+        center: [userLocation.longitude, userLocation.latitude],
+        zoom: 10,
+        pitch: perspective ? 38 : 0,
+        bearing: perspective ? -8 : 0,
+        duration: 650,
+      });
+      return;
+    }
+    if (mappableStations.length === 0) {
       map.fitBounds(SPAIN_BOUNDS, { padding: 22, duration: 500 });
       return;
     }
-    const longitudes = stations.map((station) => station.lngE6 / 1_000_000);
-    const latitudes = stations.map((station) => station.latE6 / 1_000_000);
+    const longitudes = mappableStations.map((station) => station.lngE6 / 1_000_000);
+    const latitudes = mappableStations.map((station) => station.latE6 / 1_000_000);
     map.fitBounds([
       [Math.min(...longitudes), Math.min(...latitudes)],
       [Math.max(...longitudes), Math.max(...latitudes)],
     ], { padding: 52, maxZoom: 12, duration: 650 });
-  }, [ready, stations]);
+  }, [mappableStations, perspective, ready, userLocation]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -199,7 +218,7 @@ export default function StationMap({ stations, selectedId, userLocation, loading
       {!ready && !mapError ? <div className="map-loading"><span /><strong>Cargando mapa…</strong></div> : null}
       {mapError ? <div className="map-loading error"><MapPin size={24} /><strong>No se pudo cargar el mapa</strong><span>La lista sigue disponible más abajo.</span><button onClick={retryMap}>Reintentar</button></div> : null}
       <div className={`map-toolbar ${selectedStation ? "with-selection" : ""}`}>
-        <div className="map-toolbar-count"><MapPin size={14} /><strong>{stations.length}</strong><span>en el mapa{loading ? " · actualizando…" : ""}</span></div>
+        <div className="map-toolbar-count"><MapPin size={14} /><strong>{mappableStations.length}</strong><span>{userLocation ? "cerca de ti" : "en el mapa"}{loading ? " · actualizando…" : ""}</span></div>
         <button className="map-location-action" onClick={userLocation ? recenter : onRequestLocation}>
           <LocateFixed size={16} /><span>{userLocation ? "Mi posición" : "Usar ubicación"}</span>
         </button>

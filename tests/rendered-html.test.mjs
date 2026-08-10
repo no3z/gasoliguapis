@@ -120,6 +120,8 @@ test("connects the filtered station list to an interactive map", async () => {
   assert.match(map, /flyTo/);
   assert.match(map, /setPerspectiveMode/);
   assert.match(map, /map-toolbar/);
+  assert.match(map, /mappableStations/);
+  assert.match(map, /offset: \[0, -7\]/);
   assert.match(map, /onRequestLocation/);
   assert.doesNotMatch(map, /map\.on\("error"/);
   assert.match(explorer, /Ver en mapa/);
@@ -127,6 +129,8 @@ test("connects the filtered station list to an interactive map", async () => {
   assert.match(explorer, /Apple Maps/);
   assert.match(explorer, /orderedOfficialStations/);
   assert.match(explorer, /selectedDistanceKm/);
+  assert.match(explorer, /search-section/);
+  assert.match(explorer, /enableHighAccuracy: true/);
   assert.match(explorer, /Seleccionada \+ cercanas/);
   assert.match(explorer, /km de la seleccionada/);
   assert.match(explorer, /serviceFilters/);

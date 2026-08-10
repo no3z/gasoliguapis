@@ -119,8 +119,8 @@ export async function POST(
 
   const latitude = Number(body?.latitude);
   const longitude = Number(body?.longitude);
-  const validLocation = Number.isFinite(latitude) && latitude >= 35 && latitude <= 44.5
-    && Number.isFinite(longitude) && longitude >= -10 && longitude <= 5;
+  const validLocation = Number.isFinite(latitude) && latitude >= 27 && latitude <= 44.5
+    && Number.isFinite(longitude) && longitude >= -19 && longitude <= 5;
   const proximityVerified = validLocation
     ? haversineKm(latitude, longitude, station.latE6 / 1_000_000, station.lngE6 / 1_000_000) <= 2
     : false;

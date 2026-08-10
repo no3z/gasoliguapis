@@ -112,7 +112,7 @@ export async function POST(request: Request) {
       const officialId = station.IDEESS;
       const lat = coordinate(station.Latitud);
       const lng = coordinate(station["Longitud (WGS84)"]);
-      if (!officialId || lat === null || lng === null) continue;
+      if (!officialId || lat === null || lng === null || lat < 27 || lat > 44.5 || lng < -19 || lng > 5) continue;
       const stationId = `miteco:${officialId}`;
       const geoCell = `${lat.toFixed(1)}:${lng.toFixed(1)}`;
       statements.push(runtime.DB.prepare(`INSERT INTO stations

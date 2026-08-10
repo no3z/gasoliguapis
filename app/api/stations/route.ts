@@ -57,8 +57,8 @@ export async function GET(request: Request) {
   const requestedSort = sortParam === "distance" ? "distance" : sortParam === "rating" ? "rating" : "price";
   const latitude = Number(url.searchParams.get("lat"));
   const longitude = Number(url.searchParams.get("lng"));
-  const hasLocation = Number.isFinite(latitude) && latitude >= 35 && latitude <= 44.5
-    && Number.isFinite(longitude) && longitude >= -10 && longitude <= 5;
+  const hasLocation = Number.isFinite(latitude) && latitude >= 27 && latitude <= 44.5
+    && Number.isFinite(longitude) && longitude >= -19 && longitude <= 5;
   const requestedRadius = Number(url.searchParams.get("radiusKm") || 75);
   const radiusKm = Number.isFinite(requestedRadius) ? Math.min(250, Math.max(5, requestedRadius)) : 75;
   const sort = requestedSort === "distance" && !hasLocation ? "price" : requestedSort;
@@ -139,6 +139,8 @@ export async function GET(request: Request) {
     LEFT JOIN station_confirmation_summaries restaurant_check ON restaurant_check.station_id = s.id AND restaurant_check.category = 'restaurant'
     LEFT JOIN station_confirmation_summaries cleanliness_check ON cleanliness_check.station_id = s.id AND cleanliness_check.category = 'cleanliness'
     WHERE s.status = 'active'
+      AND s.lat_e6 BETWEEN 27000000 AND 44500000
+      AND s.lng_e6 BETWEEN -19000000 AND 5000000
       AND (? IS NULL OR lower(s.province) = lower(?))
       AND (? IS NULL OR lower(coalesce(s.name, '') || ' ' || coalesce(s.brand, '') || ' ' || coalesce(s.address, '') || ' ' || coalesce(s.municipality, '') || ' ' || coalesce(s.province, '')) LIKE ?)
       AND (? = 0 OR lpg.station_id IS NOT NULL)

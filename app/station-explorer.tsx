@@ -183,7 +183,7 @@ export default function StationExplorer({
   const [searchTerm, setSearchTerm] = useState("");
   const [province, setProvince] = useState("");
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(true);
   const [sort, setSort] = useState<SortMode>("price");
   const [fuel, setFuel] = useState<FuelCode>(initialFuel);
   const [requiredProducts, setRequiredProducts] = useState<ProductCode[]>([]);
@@ -213,9 +213,9 @@ export default function StationExplorer({
   const provinceLabel = displayProvince(province);
   const requiredProductsKey = [...requiredProducts].sort().join(",");
   const serviceFiltersKey = [...serviceFilters].sort().join(",");
-  const locationKey = location ? `${location.latitude.toFixed(2)},${location.longitude.toFixed(2)}` : "national";
+  const locationKey = location ? `${location.latitude.toFixed(4)},${location.longitude.toFixed(4)}` : "national";
   const officialRequestKey = `${fuel}|${province}|${requiredProductsKey}|${serviceFiltersKey}|${searchTerm}|${locationKey}|${sort}`;
-  const officialLoading = officialState.key !== officialRequestKey;
+  const officialLoading = (locationLoading && !location) || officialState.key !== officialRequestKey;
   const officialStations = useMemo(
     () => officialLoading ? [] : officialState.stations,
     [officialLoading, officialState.stations],
@@ -229,13 +229,14 @@ export default function StationExplorer({
   }, [query]);
 
   useEffect(() => {
+    if (locationLoading && !location) return;
     const controller = new AbortController();
     const params = new URLSearchParams({ fuel, limit: "100", sort });
     if (province) params.set("province", province);
     if (searchTerm) params.set("q", searchTerm);
     if (location) {
-      params.set("lat", location.latitude.toFixed(2));
-      params.set("lng", location.longitude.toFixed(2));
+      params.set("lat", location.latitude.toFixed(4));
+      params.set("lng", location.longitude.toFixed(4));
       params.set("radiusKm", "75");
     }
     requiredProductsKey.split(",").filter(Boolean).forEach((product) => params.append("requires", product));
@@ -317,7 +318,7 @@ export default function StationExplorer({
         });
       });
     return () => controller.abort();
-  }, [fuel, location, officialRequestKey, province, requiredProductsKey, searchTerm, serviceFiltersKey, sort]);
+  }, [fuel, location, locationLoading, officialRequestKey, province, requiredProductsKey, searchTerm, serviceFiltersKey, sort]);
 
   const orderedOfficialStations = useMemo(() => {
     if (!selectedStationId) return officialStations;
@@ -431,8 +432,8 @@ export default function StationExplorer({
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setLocation({
-          latitude: Number(position.coords.latitude.toFixed(2)),
-          longitude: Number(position.coords.longitude.toFixed(2)),
+          latitude: Number(position.coords.latitude.toFixed(4)),
+          longitude: Number(position.coords.longitude.toFixed(4)),
         });
         setProvince("");
         setSort("distance");
@@ -444,9 +445,34 @@ export default function StationExplorer({
         setLocationLoading(false);
         showToast("No hemos podido obtener tu ubicación");
       },
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300_000 },
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 120_000 },
     );
   };
+
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      window.setTimeout(() => setLocationLoading(false), 0);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocation({
+          latitude: Number(position.coords.latitude.toFixed(4)),
+          longitude: Number(position.coords.longitude.toFixed(4)),
+        });
+        setProvince("");
+        setSort("distance");
+        setShowCount(20);
+        setLocationLoading(false);
+      },
+      () => {
+        setLocationLoading(false);
+        setToast("Activa la ubicación para ver primero las estaciones cercanas");
+        window.setTimeout(() => setToast(""), 2600);
+      },
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 120_000 },
+    );
+  }, []);
 
   const openLogin = async () => {
     setLoginOpen(true);
@@ -633,10 +659,7 @@ export default function StationExplorer({
       </header>
 
       <section className="map-stage advanced" aria-labelledby="map-heading">
-        <div className="map-stage-head advanced">
-          <div><span>MAPA NACIONAL DE PARADAS</span><h1 id="map-heading">Encuentra tu <em>mejor parada</em></h1><p>Combustible, servicios y puntuaciones sin salir del mapa.</p></div>
-          <small>{officialLoading ? "Buscando gasolineras…" : `${officialTotal.toLocaleString("es-ES")} coincidencias`}</small>
-        </div>
+        <h1 className="sr-only" id="map-heading">MAPA NACIONAL DE PARADAS · Encuentra tu mejor parada y las gasolineras cerca de ti</h1>
         <div className="map-canvas-shell">
           <StationMap
             stations={officialStations}
@@ -649,8 +672,16 @@ export default function StationExplorer({
             onDirections={openDirections}
             onRequestLocation={useMyLocation}
           />
-          <div className="map-glass-search">
-            <div className="route-card">
+        </div>
+      </section>
+
+      <section className="search-section" id="buscar" aria-labelledby="search-heading">
+        <div className="search-section-head">
+          <div><span>AFINA TU PARADA</span><h2 id="search-heading">¿Dónde y qué buscas?</h2><p>Combustible, servicios y puntuaciones en un solo lugar.</p></div>
+          <small>{officialLoading ? "Buscando gasolineras…" : `${officialTotal.toLocaleString("es-ES")} coincidencias`}</small>
+        </div>
+        <div className="search-controls">
+          <div className="route-card">
           <div className="route-field">
             <div className="route-symbol origin"><span /></div>
             <div>
@@ -682,35 +713,35 @@ export default function StationExplorer({
             {query ? <button aria-label="Limpiar búsqueda" onClick={() => setQuery("")}><X size={17} /></button> : null}
           </div>
           <button className={`nearby-button ${location ? "active" : ""}`} onClick={useMyLocation} disabled={locationLoading}>
-            <LocateFixed size={18} /> {locationLoading ? "Localizando…" : location ? "A menos de 75 km" : "Cerca de mí"}
+            <LocateFixed size={18} /> {locationLoading ? "Cerca de mí · localizando…" : location ? "A menos de 75 km" : "Cerca de mí"}
           </button>
-        </div>
-
-        <div className="fuel-picker" aria-label="Selecciona tu combustible">
-          <span>Tu combustible</span>
-          <div>
-            {fuelOptions.map((option) => (
-              <button
-                key={option.code}
-                className={fuel === option.code ? "active" : ""}
-                aria-pressed={fuel === option.code}
-                onClick={() => selectFuel(option.code)}
-              >
-                {option.code === "adblue" ? <Droplets size={15} /> : <Fuel size={15} />}{option.short}
-              </button>
-            ))}
           </div>
-        </div>
 
-        {(fuel === "lpg" || fuel === "adblue") && !location ? (
-          <button className="glp-now" onClick={useMyLocation} disabled={locationLoading}>
-            <span><b>{fuel === "lpg" ? "GLP AHORA" : "ADBLUE AHORA"}</b><strong>Encuentra puntos confirmados cerca de ti</strong><small>Usamos una ubicación aproximada y no la guardamos.</small></span>
-            {fuel === "adblue" ? <Droplets size={21} /> : <LocateFixed size={21} />}
-          </button>
-        ) : null}
+          <div className="fuel-picker" aria-label="Selecciona tu combustible">
+            <span>Tu combustible</span>
+            <div>
+              {fuelOptions.map((option) => (
+                <button
+                  key={option.code}
+                  className={fuel === option.code ? "active" : ""}
+                  aria-pressed={fuel === option.code}
+                  onClick={() => selectFuel(option.code)}
+                >
+                  {option.code === "adblue" ? <Droplets size={15} /> : <Fuel size={15} />}{option.short}
+                </button>
+              ))}
+            </div>
+          </div>
 
-        <div className="quick-filters" aria-label="Filtros rápidos">
-          {fuel !== "lpg" ? <button
+          {(fuel === "lpg" || fuel === "adblue") && !location ? (
+            <button className="glp-now" onClick={useMyLocation} disabled={locationLoading}>
+              <span><b>{fuel === "lpg" ? "GLP AHORA" : "ADBLUE AHORA"}</b><strong>Encuentra puntos confirmados cerca de ti</strong><small>Usamos una ubicación aproximada y no la guardamos.</small></span>
+              {fuel === "adblue" ? <Droplets size={21} /> : <LocateFixed size={21} />}
+            </button>
+          ) : null}
+
+          <div className="quick-filters" aria-label="Filtros rápidos">
+            {fuel !== "lpg" ? <button
               className={requiredProducts.includes("lpg") ? "active" : ""}
               aria-pressed={requiredProducts.includes("lpg")}
               onClick={() => toggleRequiredProduct("lpg")}
@@ -726,7 +757,6 @@ export default function StationExplorer({
           <button className={serviceFilters.includes("rated") ? "active" : ""} aria-pressed={serviceFilters.includes("rated")} onClick={() => toggleServiceFilter("rated")}><Star size={16} /> Con puntuación</button>
           <button onClick={() => setFilterOpen(true)}><ListFilter size={16} /> Más</button>
           </div>
-        </div>
         </div>
       </section>
 
