@@ -192,6 +192,7 @@ export default function StationExplorer({
   const [filterOpen, setFilterOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [sessionUser, setSessionUser] = useState<{ signedIn: boolean; displayName: string | null }>({ signedIn: false, displayName: null });
+  const [personalRatings, setPersonalRatings] = useState<Record<string, number>>({});
   const [toast, setToast] = useState("");
   const [officialState, setOfficialState] = useState<{
     key: string;
@@ -474,6 +475,21 @@ export default function StationExplorer({
     );
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    fetch("/api/me/ratings", { cache: "no-store" })
+      .then(async (response) => response.ok
+        ? await response.json() as { signedIn?: boolean; displayName?: string | null; ratings?: Record<string, number> }
+        : null)
+      .then((payload) => {
+        if (!active || !payload) return;
+        setSessionUser({ signedIn: Boolean(payload.signedIn), displayName: payload.displayName ?? null });
+        setPersonalRatings(payload.ratings ?? {});
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
+
   const openLogin = async () => {
     setLoginOpen(true);
     if (sessionUser.signedIn) return;
@@ -489,10 +505,22 @@ export default function StationExplorer({
 
   const rateStation = async (stationId: string, value: number) => {
     setRatingStation(null);
+    const station = officialStations.find((item) => item.id === stationId);
     const response = await fetch(`/api/stations/${encodeURIComponent(stationId)}/ratings/${ratingDimension}`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ value }),
+      body: JSON.stringify({
+        value,
+        station: station ? {
+          name: station.name,
+          brand: station.brand,
+          address: station.address,
+          municipality: station.municipality,
+          province: station.province,
+          latE6: station.latE6,
+          lngE6: station.lngE6,
+        } : undefined,
+      }),
     });
     if (response.status === 401) {
       await openLogin();
@@ -512,6 +540,9 @@ export default function StationExplorer({
           ? { ...station, [ratingField]: payload.stats?.average, [countField]: payload.stats?.count }
           : station),
       }));
+    }
+    if (ratingDimension === "overall") {
+      setPersonalRatings((current) => ({ ...current, [stationId]: value }));
     }
     setSessionUser((current) => ({ signedIn: true, displayName: current.displayName }));
     const dimensionLabel = ratingOptions.find((item) => item.code === ratingDimension)?.label.toLowerCase() || "parada";
@@ -667,6 +698,7 @@ export default function StationExplorer({
             userLocation={location}
             loading={officialLoading}
             fuelLabel={selectedFuel.label}
+            personalRatings={personalRatings}
             onSelect={setSelectedStationId}
             onOpenList={openStationInList}
             onDirections={openDirections}
@@ -805,9 +837,9 @@ export default function StationExplorer({
                 {stationHighlights(station).map((item) => <div className={item.className} key={item.label}><span>{item.label}</span><strong>{item.value}</strong><small>{item.detail}</small></div>)}
               </div>
               <div className="official-source"><Check size={13} /> MITECO · {formatOfficialTime(station.priceObservedAt)}</div>
-              <button className="overall-score" onClick={() => { setRatingStation(station.id); setRatingDimension("overall"); }}>
-                <span><Star size={15} fill="currentColor" /> {station.overallCount ? Number(station.overallRating).toFixed(1) : "Sin nota"}</span>
-                <small>{station.overallCount ? `${station.overallCount} valoraciones de la parada` : "Sé la primera persona en puntuarla"}</small>
+              <button className={`overall-score ${personalRatings[station.id] ? "user-rated" : ""}`} onClick={() => { setRatingStation(station.id); setRatingDimension("overall"); }}>
+                <span><Star size={15} fill="currentColor" /> {personalRatings[station.id] ? `Tu nota ${personalRatings[station.id]}/5` : station.overallCount ? Number(station.overallRating).toFixed(1) : "Sin nota"}</span>
+                <small>{personalRatings[station.id] ? `${station.overallCount ? `Media ${Number(station.overallRating).toFixed(1)} · ` : ""}Toca para cambiar tu valoración` : station.overallCount ? `${station.overallCount} valoraciones de la parada` : "Sé la primera persona en puntuarla"}</small>
               </button>
               {(fuel === "lpg" || fuel === "adblue") && recentConfirmation(station.fuelCommunityStatus, station.fuelCommunityAt) ? (
                 <div className={`fuel-confirmation ${station.fuelCommunityStatus === "working" ? "positive" : "warning"}`}>
@@ -833,7 +865,10 @@ export default function StationExplorer({
                 <div className="rating-picker">
                   <div className="rating-dimensions">{ratingOptions.map((option) => <button className={ratingDimension === option.code ? "active" : ""} key={option.code} onClick={() => setRatingDimension(option.code)}>{option.code === "bathroom" ? <Bath size={13} /> : option.code === "coffee" ? <Coffee size={13} /> : option.code === "cleanliness" ? <Sparkles size={13} /> : <Star size={13} />}{option.label}</button>)}</div>
                   <span>¿Qué nota le das a {ratingOptions.find((item) => item.code === ratingDimension)?.label.toLowerCase()}?</span>
-                  <div className="rating-stars">{[1, 2, 3, 4, 5].map((value) => <button key={value} aria-label={`${value} estrellas para ${ratingDimension}`} onClick={() => rateStation(station.id, value)}><Star size={22} fill="currentColor" /></button>)}</div>
+                  <div className="rating-stars">{[1, 2, 3, 4, 5].map((value) => {
+                    const selected = ratingDimension === "overall" && value <= (personalRatings[station.id] || 0);
+                    return <button className={selected ? "active" : ""} key={value} aria-label={`${value} estrellas para ${ratingDimension}`} onClick={() => rateStation(station.id, value)}><Star size={22} fill={selected ? "currentColor" : "none"} /></button>;
+                  })}</div>
                 </div>
               ) : null}
             </article>

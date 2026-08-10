@@ -123,8 +123,8 @@ test("connects the filtered station list to an interactive map", async () => {
   assert.match(map, /map-toolbar/);
   assert.match(map, /mappableStations/);
   assert.match(map, /offset: \[0, -7\]/);
-  assert.match(css, /\.map-station-marker \{ position: absolute;/);
-  assert.doesNotMatch(css, /\.map-station-marker \{ position: relative;/);
+  assert.match(css, /\.map-station-marker \{[^}]*position: absolute;/);
+  assert.doesNotMatch(css, /\.map-station-marker \{[^}]*position: relative;/);
   assert.match(map, /onRequestLocation/);
   assert.doesNotMatch(map, /map\.on\("error"/);
   assert.match(explorer, /Ver en mapa/);
@@ -137,6 +137,11 @@ test("connects the filtered station list to an interactive map", async () => {
   assert.match(explorer, /Seleccionada \+ cercanas/);
   assert.match(explorer, /km de la seleccionada/);
   assert.match(explorer, /serviceFilters/);
+  assert.match(explorer, /personalRatings/);
+  assert.match(map, /map-marker-user-rating/);
+  assert.match(css, /rating-low/);
+  assert.match(css, /rating-mid/);
+  assert.match(css, /rating-high/);
   assert.match(stationsApi, /sortParam === "rating"/);
   assert.match(stationsApi, /restaurant_check\.latest_status/);
 });

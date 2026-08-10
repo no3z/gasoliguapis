@@ -33,6 +33,7 @@ type Props = {
   userLocation: { latitude: number; longitude: number } | null;
   loading: boolean;
   fuelLabel: string;
+  personalRatings: Record<string, number>;
   onSelect: (stationId: string) => void;
   onOpenList: (stationId: string) => void;
   onDirections: (stationId: string) => void;
@@ -45,7 +46,7 @@ function formatPrice(micros: number) {
   return `${(micros / 1_000_000).toLocaleString("es-ES", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} €`;
 }
 
-export default function StationMap({ stations, selectedId, userLocation, loading, fuelLabel, onSelect, onOpenList, onDirections, onRequestLocation }: Props) {
+export default function StationMap({ stations, selectedId, userLocation, loading, fuelLabel, personalRatings, onSelect, onOpenList, onDirections, onRequestLocation }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markersRef = useRef<MapLibreMarker[]>([]);
@@ -68,6 +69,10 @@ export default function StationMap({ stations, selectedId, userLocation, loading
   const selectedStation = useMemo(
     () => mappableStations.find((station) => station.id === selectedId) ?? null,
     [mappableStations, selectedId],
+  );
+  const visiblePersonalRatingCount = useMemo(
+    () => mappableStations.filter((station) => Boolean(personalRatings[station.id])).length,
+    [mappableStations, personalRatings],
   );
 
   useEffect(() => {
@@ -115,14 +120,22 @@ export default function StationMap({ stations, selectedId, userLocation, loading
       if (!active || mapRef.current !== map) return;
       markersRef.current.forEach((marker) => marker.remove());
       markersRef.current = mappableStations.map((station) => {
+        const personalRating = personalRatings[station.id];
+        const ratingTone = personalRating <= 2 ? "low" : personalRating === 3 ? "mid" : "high";
         const markerButton = document.createElement("button");
         markerButton.type = "button";
-        markerButton.className = `map-station-marker${station.id === selectedId ? " selected" : ""}`;
-        markerButton.title = `${station.name}: ${formatPrice(station.priceMicros)}`;
+        markerButton.className = `map-station-marker${station.id === selectedId ? " selected" : ""}${personalRating ? ` user-rated rating-${ratingTone}` : ""}`;
+        markerButton.title = `${station.name}: ${formatPrice(station.priceMicros)}${personalRating ? ` · Tu nota ${personalRating}/5` : ""}`;
         markerButton.setAttribute("aria-label", markerButton.title);
         const priceLabel = document.createElement("span");
         priceLabel.textContent = formatPrice(station.priceMicros).replace(" €", "");
         markerButton.appendChild(priceLabel);
+        if (personalRating) {
+          const personalBadge = document.createElement("b");
+          personalBadge.className = "map-marker-user-rating";
+          personalBadge.textContent = `★ ${personalRating}`;
+          markerButton.appendChild(personalBadge);
+        }
         markerButton.addEventListener("click", () => onSelectRef.current(station.id));
         return new maplibre.Marker({ element: markerButton, anchor: "bottom", offset: [0, -7] })
           .setLngLat([station.lngE6 / 1_000_000, station.latE6 / 1_000_000])
@@ -130,7 +143,7 @@ export default function StationMap({ stations, selectedId, userLocation, loading
       });
     });
     return () => { active = false; };
-  }, [mappableStations, ready, selectedId]);
+  }, [mappableStations, personalRatings, ready, selectedId]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -218,7 +231,7 @@ export default function StationMap({ stations, selectedId, userLocation, loading
       {!ready && !mapError ? <div className="map-loading"><span /><strong>Cargando mapa…</strong></div> : null}
       {mapError ? <div className="map-loading error"><MapPin size={24} /><strong>No se pudo cargar el mapa</strong><span>La lista sigue disponible más abajo.</span><button onClick={retryMap}>Reintentar</button></div> : null}
       <div className={`map-toolbar ${selectedStation ? "with-selection" : ""}`}>
-        <div className="map-toolbar-count"><MapPin size={14} /><strong>{mappableStations.length}</strong><span>{userLocation ? "cerca de ti" : "en el mapa"}{loading ? " · actualizando…" : ""}</span></div>
+        <div className="map-toolbar-count"><MapPin size={14} /><strong>{mappableStations.length}</strong><span>{userLocation ? "cerca de ti" : "en el mapa"}{visiblePersonalRatingCount ? ` · ★ ${visiblePersonalRatingCount} tuyas` : ""}{loading ? " · actualizando…" : ""}</span></div>
         <button className="map-location-action" onClick={userLocation ? recenter : onRequestLocation}>
           <LocateFixed size={16} /><span>{userLocation ? "Mi posición" : "Usar ubicación"}</span>
         </button>
@@ -232,7 +245,7 @@ export default function StationMap({ stations, selectedId, userLocation, loading
           <button className="map-selection-main" onClick={() => onOpenList(selectedStation.id)}>
             <span>{selectedStation.municipality || "Estación seleccionada"}</span>
             <strong>{selectedStation.name}</strong>
-            <small>{fuelLabel} · {formatPrice(selectedStation.priceMicros)}{selectedStation.overallCount ? ` · ★ ${Number(selectedStation.overallRating).toFixed(1)}` : " · sin nota todavía"}</small>
+            <small>{fuelLabel} · {formatPrice(selectedStation.priceMicros)}{personalRatings[selectedStation.id] ? ` · Tu ★ ${personalRatings[selectedStation.id]}` : selectedStation.overallCount ? ` · Media ★ ${Number(selectedStation.overallRating).toFixed(1)}` : " · sin nota todavía"}</small>
           </button>
           <div className="map-selection-actions">
             <button onClick={() => onDirections(selectedStation.id)}><Navigation size={15} /> Ruta</button>

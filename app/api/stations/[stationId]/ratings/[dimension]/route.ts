@@ -11,7 +11,21 @@ type Database = {
   batch: (statements: Prepared[]) => Promise<unknown>;
 };
 
+type StationSeed = {
+  name?: unknown;
+  brand?: unknown;
+  address?: unknown;
+  municipality?: unknown;
+  province?: unknown;
+  latE6?: unknown;
+  lngE6?: unknown;
+};
+
 const DIMENSIONS = new Set(["overall", "coffee", "bathroom", "cleanliness", "accessibility", "value"]);
+
+function shortText(value: unknown, maxLength: number) {
+  return typeof value === "string" ? value.trim().slice(0, maxLength) || null : null;
+}
 
 export async function PUT(
   request: Request,
@@ -27,15 +41,42 @@ export async function PUT(
 
   const { stationId, dimension } = await context.params;
   if (!DIMENSIONS.has(dimension)) return Response.json({ error: "Dimensión no válida" }, { status: 400 });
-  const body = await request.json().catch(() => null) as { value?: unknown } | null;
+  const body = await request.json().catch(() => null) as { value?: unknown; station?: StationSeed } | null;
   const value = Number(body?.value);
   if (!Number.isInteger(value) || value < 1 || value > 5) {
     return Response.json({ error: "La puntuación debe estar entre 1 y 5" }, { status: 400 });
   }
 
   const database = (env as unknown as { DB: Database }).DB;
-  const station = await database.prepare("SELECT id FROM stations WHERE id = ? AND status = 'active'").bind(stationId).first<{ id: string }>();
-  if (!station) return Response.json({ error: "Estación no encontrada" }, { status: 404 });
+  let station = await database.prepare("SELECT id FROM stations WHERE id = ? AND status = 'active'").bind(stationId).first<{ id: string }>();
+  if (!station) {
+    const seed = body?.station;
+    const latE6 = Number(seed?.latE6);
+    const lngE6 = Number(seed?.lngE6);
+    const name = shortText(seed?.name, 140);
+    if (!/^miteco:\d+$/.test(stationId) || !name || !Number.isInteger(latE6) || !Number.isInteger(lngE6)
+      || latE6 < 27_000_000 || latE6 > 44_500_000 || lngE6 < -19_000_000 || lngE6 > 5_000_000) {
+      return Response.json({ error: "Estación no encontrada" }, { status: 404 });
+    }
+    const stationNow = Date.now();
+    await database.prepare(`INSERT OR IGNORE INTO stations
+      (id, official_id, name, brand, address, municipality, province, lat_e6, lng_e6, geo_cell, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`).bind(
+        stationId,
+        stationId.slice("miteco:".length),
+        name,
+        shortText(seed?.brand, 100),
+        shortText(seed?.address, 200),
+        shortText(seed?.municipality, 100),
+        shortText(seed?.province, 80),
+        latE6,
+        lngE6,
+        `${(latE6 / 1_000_000).toFixed(1)}:${(lngE6 / 1_000_000).toFixed(1)}`,
+        stationNow,
+        stationNow,
+      ).run();
+    station = { id: stationId };
+  }
 
   const now = Date.now();
   const localUserId = `chatgpt:${user.userId}`;

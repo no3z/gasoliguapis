@@ -94,7 +94,7 @@ export async function POST(
     const lngE6 = Number(seed?.lngE6);
     const name = shortText(seed?.name, 140);
     if (!/^miteco:\d+$/.test(stationId) || !name || !Number.isInteger(latE6) || !Number.isInteger(lngE6)
-      || latE6 < 35_000_000 || latE6 > 44_500_000 || lngE6 < -10_000_000 || lngE6 > 5_000_000) {
+      || latE6 < 27_000_000 || latE6 > 44_500_000 || lngE6 < -19_000_000 || lngE6 > 5_000_000) {
       return Response.json({ error: "Estación no encontrada" }, { status: 404 });
     }
     const now = Date.now();
