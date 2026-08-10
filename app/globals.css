@@ -106,6 +106,7 @@ button, select { cursor: pointer; }
 .station-logo.official { --brand-accent: var(--green); background: linear-gradient(145deg, #1d9674, #116a54); }
 .official-card-head > div:nth-child(2) { min-width: 0; }
 .official-badge { display: flex; align-items: center; gap: 4px; margin-bottom: 3px; color: var(--green); font-size: 8px; font-weight: 900; letter-spacing: .7px; }
+.near-selected { display: flex; align-items: center; gap: 3px; width: max-content; margin-bottom: 3px; padding: 3px 5px; border-radius: 6px; color: #a74732; background: #fff0eb; font-size: 7px; font-weight: 850; }
 .official-card h3 { overflow: hidden; margin: 0; font-size: 16px; line-height: 1.2; letter-spacing: -.3px; text-overflow: ellipsis; white-space: nowrap; }
 .official-card-head p { display: flex; align-items: flex-start; gap: 3px; margin: 5px 0 0; color: #73807f; font-size: 9px; line-height: 1.35; }
 .official-card-head p svg { flex: 0 0 auto; }

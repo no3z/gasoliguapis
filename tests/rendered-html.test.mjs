@@ -123,6 +123,9 @@ test("connects the filtered station list to an interactive map", async () => {
   assert.match(explorer, /Google Maps/);
   assert.match(explorer, /Apple Maps/);
   assert.match(explorer, /orderedOfficialStations/);
+  assert.match(explorer, /selectedDistanceKm/);
+  assert.match(explorer, /Seleccionada \+ cercanas/);
+  assert.match(explorer, /km de la seleccionada/);
   assert.match(explorer, /serviceFilters/);
   assert.match(stationsApi, /sortParam === "rating"/);
   assert.match(stationsApi, /restaurant_check\.latest_status/);

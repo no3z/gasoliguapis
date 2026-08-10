@@ -322,7 +322,21 @@ export default function StationExplorer({
   const orderedOfficialStations = useMemo(() => {
     if (!selectedStationId) return officialStations;
     const selected = officialStations.find((station) => station.id === selectedStationId);
-    return selected ? [selected, ...officialStations.filter((station) => station.id !== selectedStationId)] : officialStations;
+    if (!selected) return officialStations;
+    const nearbyAlternatives = officialStations
+      .filter((station) => station.id !== selectedStationId)
+      .map((station) => ({
+        station,
+        selectedDistanceKm: distanceKm(
+          selected.latE6 / 1_000_000,
+          selected.lngE6 / 1_000_000,
+          station.latE6 / 1_000_000,
+          station.lngE6 / 1_000_000,
+        ),
+      }))
+      .sort((left, right) => left.selectedDistanceKm - right.selectedDistanceKm || left.station.priceMicros - right.station.priceMicros)
+      .map(({ station }) => station);
+    return [selected, ...nearbyAlternatives];
   }, [officialStations, selectedStationId]);
   const visibleOfficialStations = useMemo(() => orderedOfficialStations.slice(0, showCount), [orderedOfficialStations, showCount]);
   const recommendedStationId = useMemo(() => {
@@ -346,6 +360,9 @@ export default function StationExplorer({
   }, [location, officialStations]);
   const recommendedStation = recommendedStationId
     ? officialStations.find((station) => station.id === recommendedStationId) ?? null
+    : null;
+  const selectedOfficialStation = selectedStationId
+    ? officialStations.find((station) => station.id === selectedStationId) ?? null
     : null;
 
   const focusStationOnMap = (stationId: string) => {
@@ -718,7 +735,7 @@ export default function StationExplorer({
             <span className="result-kicker">CATÁLOGO OFICIAL · MITECO</span>
             <h2>{officialLoading ? "Buscando paradas…" : `${officialTotal.toLocaleString("es-ES")} con ${selectedFuel.label}`}</h2>
           </div>
-          <label className="result-sort"><ListFilter size={14} /><select value={sort} onChange={(event) => { setSort(event.target.value as SortMode); setShowCount(20); }} aria-label="Ordenar resultados"><option value="price">Más baratas</option><option value="rating">Mejor puntuadas</option><option value="distance" disabled={!location}>Más cercanas</option></select></label>
+          <label className="result-sort"><ListFilter size={14} /><select value={selectedStationId ? "selected" : sort} onChange={(event) => { setSelectedStationId(null); setSort(event.target.value as SortMode); setShowCount(20); }} aria-label="Ordenar resultados">{selectedStationId ? <option value="selected">Seleccionada + cercanas</option> : null}<option value="price">Más baratas</option><option value="rating">Mejor puntuadas</option><option value="distance" disabled={!location}>Más cercanas</option></select></label>
         </div>
 
         <p className="official-context"><ShieldCheck size={14} /> {location ? "Estaciones en un radio de 75 km; la distancia es en línea recta." : province ? `Resultados oficiales en ${provinceLabel}.` : "Búsqueda nacional en toda España."} Precio y disponibilidad procedentes de MITECO.</p>
@@ -744,6 +761,7 @@ export default function StationExplorer({
               <div className="official-card-head">
                 <div className="station-logo official">{(station.brand || station.name).slice(0, 1)}</div>
                 <div>
+                  {selectedOfficialStation && station.id !== selectedOfficialStation.id ? <span className="near-selected"><MapPin size={11} /> {distanceKm(selectedOfficialStation.latE6 / 1_000_000, selectedOfficialStation.lngE6 / 1_000_000, station.latE6 / 1_000_000, station.lngE6 / 1_000_000).toFixed(1)} km de la seleccionada</span> : null}
                   <span className="official-badge"><ShieldCheck size={13} /> PRECIO OFICIAL</span>
                   <h3>{station.name}</h3>
                   <p><MapPin size={13} /> {[station.address, station.municipality, displayProvince(station.province)].filter(Boolean).join(" · ")}</p>
