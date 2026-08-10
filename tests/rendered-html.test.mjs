@@ -109,11 +109,12 @@ test("ships temporary community confirmations without persisting location", asyn
 });
 
 test("connects the filtered station list to an interactive map", async () => {
-  const [map, explorer, stationsApi, packageJson] = await Promise.all([
+  const [map, explorer, stationsApi, packageJson, css] = await Promise.all([
     readFile(new URL("../app/station-map.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/station-explorer.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/stations/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   ]);
   assert.match(packageJson, /maplibre-gl/);
   assert.match(map, /tiles\.openfreemap\.org\/styles\/liberty/);
@@ -122,6 +123,8 @@ test("connects the filtered station list to an interactive map", async () => {
   assert.match(map, /map-toolbar/);
   assert.match(map, /mappableStations/);
   assert.match(map, /offset: \[0, -7\]/);
+  assert.match(css, /\.map-station-marker \{ position: absolute;/);
+  assert.doesNotMatch(css, /\.map-station-marker \{ position: relative;/);
   assert.match(map, /onRequestLocation/);
   assert.doesNotMatch(map, /map\.on\("error"/);
   assert.match(explorer, /Ver en mapa/);
