@@ -24,14 +24,21 @@ const FUELS = [
   ["diesel_a", "Gasóleo A", "Precio Gasoleo A"],
   ["diesel_premium", "Gasóleo Premium", "Precio Gasoleo Premium"],
   ["lpg", "GLP", "Precio Gases licuados del petróleo"],
+  ["adblue", "AdBlue", "Precio Adblue"],
   ["cng", "GNC", "Precio Gas Natural Comprimido"],
   ["lng", "GNL", "Precio Gas Natural Licuado"],
   ["hydrogen", "Hidrógeno", "Precio Hidrogeno"],
 ] as const;
 
-function decimal(value?: string) {
+function priceDecimal(value?: string) {
   if (!value) return null;
-  const parsed = Number(value.replace(/\./g, "").replace(",", "."));
+  const parsed = Number(value.trim().replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function coordinate(value?: string) {
+  if (!value) return null;
+  const parsed = Number(value.trim().replace(",", "."));
   return Number.isFinite(parsed) ? parsed : null;
 }
 
@@ -77,8 +84,8 @@ export async function POST(request: Request) {
     const statements: Prepared[] = [];
     for (const station of selected.slice(batchStart, batchStart + 8)) {
       const officialId = station.IDEESS;
-      const lat = decimal(station.Latitud);
-      const lng = decimal(station["Longitud (WGS84)"]);
+      const lat = coordinate(station.Latitud);
+      const lng = coordinate(station["Longitud (WGS84)"]);
       if (!officialId || lat === null || lng === null) continue;
       const stationId = `miteco:${officialId}`;
       const geoCell = `${lat.toFixed(1)}:${lng.toFixed(1)}`;
@@ -98,8 +105,13 @@ export async function POST(request: Request) {
             Math.round(lat * 1_000_000), Math.round(lng * 1_000_000), geoCell, observedAt, now, now,
           ));
 
+      // Replace the complete official price snapshot for this station so a
+      // product that disappears from the feed never remains as a stale match.
+      statements.push(runtime.DB.prepare(`DELETE FROM station_current_prices
+        WHERE station_id = ? AND source_id = 'miteco-prices'`).bind(stationId));
+
       for (const [fuelId, , sourceField] of FUELS) {
-        const price = decimal(station[sourceField]);
+        const price = priceDecimal(station[sourceField]);
         if (price === null || price <= 0) continue;
         pricesWritten += 1;
         statements.push(runtime.DB.prepare(`INSERT INTO station_current_prices

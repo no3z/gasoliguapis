@@ -9,7 +9,9 @@ Aplicación móvil para encontrar la mejor parada en carretera por sentido, desv
 - Esquema D1 de 20 tablas para catálogo, red viaria, precios, comunidad, fotos y moderación.
 - Ingesta paginada y protegida del censo/precios oficiales de MITECO.
 - R2 reservado para fotos aportadas por usuarios.
-- Google/Facebook OAuth está representado en la experiencia, pero no simula un acceso real hasta seleccionar y configurar un proveedor compatible.
+- Filtros oficiales por Gasóleo A, Gasolina 95, GLP y AdBlue, con requisitos combinables GLP + AdBlue.
+- Votos 1–5 autenticados con la identidad disponible en Sites; el esquema conserva soporte multi-proveedor para Google/Facebook.
+- Google/Facebook no simulan un acceso real hasta confirmar callbacks y configurar credenciales compatibles.
 
 ## Desarrollo
 

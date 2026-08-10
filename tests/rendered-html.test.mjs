@@ -24,8 +24,11 @@ test("server-renders the Gasoliguapis product", async () => {
   const html = await response.text();
   assert.match(html, /<title>Gasoliguapis — Tu mejor parada en carretera(?: · Gasoliguapis)?<\/title>/i);
   assert.match(html, /¿Dónde paramos/);
-  assert.match(html, /VISTA PREVIA · DATOS DE MUESTRA/);
+  assert.match(html, /CATÁLOGO OFICIAL · MITECO/);
   assert.match(html, /Café rico, baños limpios/);
+  assert.match(html, /Tu combustible/);
+  assert.match(html, /Tiene GLP/);
+  assert.match(html, /Tiene AdBlue/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);
 });
 
