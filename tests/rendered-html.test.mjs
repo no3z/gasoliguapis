@@ -89,3 +89,18 @@ test("ships a compact official fallback for special fuels", async () => {
   assert.match(snapshot.products.lpg[0].id, /^miteco:/);
   assert.ok(snapshot.products.lpg.every((station) => Number.isInteger(station.priceMicros) && station.priceMicros > 0));
 });
+
+test("ships temporary community confirmations without persisting location", async () => {
+  const [explorer, confirmationApi, schema, migration] = await Promise.all([
+    readFile(new URL("../app/station-explorer.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/stations/[stationId]/confirmations/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+    readFile(new URL("../.openai/drizzle/0002_classy_iron_man.sql", import.meta.url), "utf8"),
+  ]);
+  assert.match(explorer, /Confirmar GLP, AdBlue o servicios/);
+  assert.match(explorer, /Nuestra propuesta cerca de ti/i);
+  assert.match(explorer, /Tu ubicación no se guarda/);
+  assert.match(confirmationApi, /proximityVerified/);
+  assert.doesNotMatch(schema, /latitude|longitude|accuracy/i);
+  assert.match(migration, /station_confirmation_summaries/);
+});

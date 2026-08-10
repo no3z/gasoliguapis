@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   Sparkles,
   Star,
+  UtensilsCrossed,
   UserRound,
   X,
   Zap,
@@ -30,6 +31,8 @@ type FuelCode = "diesel_a" | "gasoline_95_e5" | "lpg" | "adblue";
 type ProductCode = "lpg" | "adblue";
 type SortMode = "price" | "distance";
 type RatingDimension = "overall" | "bathroom" | "coffee" | "cleanliness";
+type ConfirmationCategory = "lpg_status" | "adblue_status" | "bathroom" | "coffee" | "restaurant" | "cleanliness";
+type ConfirmationStatus = "working" | "no_product" | "broken" | "closed" | "clean" | "dirty" | "good" | "poor";
 
 type OfficialStation = {
   id: string;
@@ -54,6 +57,17 @@ type OfficialStation = {
   coffeeCount?: number;
   cleanlinessRating?: number | null;
   cleanlinessCount?: number;
+  fuelCommunityStatus?: ConfirmationStatus | null;
+  fuelCommunityAt?: number | null;
+  fuelCommunityNearby?: number | boolean;
+  bathroomStatus?: ConfirmationStatus | null;
+  bathroomStatusAt?: number | null;
+  coffeeStatus?: ConfirmationStatus | null;
+  coffeeStatusAt?: number | null;
+  restaurantStatus?: ConfirmationStatus | null;
+  restaurantStatusAt?: number | null;
+  cleanlinessStatus?: ConfirmationStatus | null;
+  cleanlinessStatusAt?: number | null;
 };
 
 type StaticFuelStation = Pick<OfficialStation, "id" | "name" | "brand" | "address" | "municipality" | "province" | "latE6" | "lngE6" | "priceMicros">;
@@ -87,6 +101,46 @@ const ratingOptions: { code: RatingDimension; label: string }[] = [
   { code: "overall", label: "Parada" },
   { code: "bathroom", label: "Baños" },
   { code: "coffee", label: "Café" },
+  { code: "cleanliness", label: "Limpieza" },
+];
+const confirmationOptions: Record<ConfirmationCategory, Array<{ status: ConfirmationStatus; label: string; tone: "positive" | "negative" | "neutral" }>> = {
+  lpg_status: [
+    { status: "working", label: "He repostado GLP", tone: "positive" },
+    { status: "no_product", label: "No había GLP", tone: "negative" },
+    { status: "broken", label: "Surtidor averiado", tone: "negative" },
+  ],
+  adblue_status: [
+    { status: "working", label: "He repostado AdBlue", tone: "positive" },
+    { status: "no_product", label: "No había AdBlue", tone: "negative" },
+    { status: "broken", label: "Surtidor averiado", tone: "negative" },
+  ],
+  bathroom: [
+    { status: "clean", label: "Abierto y limpio", tone: "positive" },
+    { status: "dirty", label: "Estaba sucio", tone: "negative" },
+    { status: "closed", label: "Cerrado", tone: "neutral" },
+  ],
+  coffee: [
+    { status: "good", label: "Abierto y bien", tone: "positive" },
+    { status: "poor", label: "Mala experiencia", tone: "negative" },
+    { status: "closed", label: "Cerrado", tone: "neutral" },
+  ],
+  restaurant: [
+    { status: "good", label: "Abierto y bien", tone: "positive" },
+    { status: "poor", label: "Mala experiencia", tone: "negative" },
+    { status: "closed", label: "Cerrado", tone: "neutral" },
+  ],
+  cleanliness: [
+    { status: "clean", label: "La parada está limpia", tone: "positive" },
+    { status: "dirty", label: "Necesita limpieza", tone: "negative" },
+  ],
+};
+
+const confirmationCategories: Array<{ code: ConfirmationCategory; label: string }> = [
+  { code: "lpg_status", label: "GLP" },
+  { code: "adblue_status", label: "AdBlue" },
+  { code: "bathroom", label: "Baños" },
+  { code: "coffee", label: "Café" },
+  { code: "restaurant", label: "Restaurante" },
   { code: "cleanliness", label: "Limpieza" },
 ];
 
@@ -143,6 +197,10 @@ export default function StationExplorer({
   }>({ key: "", stations: [], total: 0, error: "" });
   const [ratingStation, setRatingStation] = useState<string | null>(null);
   const [ratingDimension, setRatingDimension] = useState<RatingDimension>("overall");
+  const [confirmationStation, setConfirmationStation] = useState<OfficialStation | null>(null);
+  const [confirmationCategory, setConfirmationCategory] = useState<ConfirmationCategory>("bathroom");
+  const [confirmationSaving, setConfirmationSaving] = useState(false);
+  const [clockNow] = useState(Date.now);
   const [showCount, setShowCount] = useState(20);
 
   const selectedFuel = fuelOptions.find((item) => item.code === fuel) ?? fuelOptions[0];
@@ -222,6 +280,11 @@ export default function StationExplorer({
                   bathroomRating: null, bathroomCount: 0,
                   coffeeRating: null, coffeeCount: 0,
                   cleanlinessRating: null, cleanlinessCount: 0,
+                  fuelCommunityStatus: null, fuelCommunityAt: null, fuelCommunityNearby: 0,
+                  bathroomStatus: null, bathroomStatusAt: null,
+                  coffeeStatus: null, coffeeStatusAt: null,
+                  restaurantStatus: null, restaurantStatusAt: null,
+                  cleanlinessStatus: null, cleanlinessStatusAt: null,
                 };
               })
               .filter((station) => !location || Number(station.distanceKm) <= 75)
@@ -245,6 +308,28 @@ export default function StationExplorer({
   }, [fuel, location, officialRequestKey, province, requiredProductsKey, searchTerm, sort]);
 
   const visibleOfficialStations = useMemo(() => officialStations.slice(0, showCount), [officialStations, showCount]);
+  const recommendedStationId = useMemo(() => {
+    if (!location || officialStations.length === 0) return null;
+    const candidates = officialStations.slice(0, 40);
+    const prices = candidates.map((station) => station.priceMicros);
+    const distances = candidates.map((station) => Number(station.distanceKm ?? 75));
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    const maxDistance = Math.max(...distances, 1);
+    return candidates.map((station) => {
+      const serviceRatings = [station.bathroomRating, station.coffeeRating, station.cleanlinessRating]
+        .filter((value): value is number => typeof value === "number");
+      const serviceScore = serviceRatings.length
+        ? serviceRatings.reduce((sum, value) => sum + value, 0) / serviceRatings.length / 5
+        : .5;
+      const priceScore = maxPrice === minPrice ? 1 : 1 - (station.priceMicros - minPrice) / (maxPrice - minPrice);
+      const distanceScore = 1 - Math.min(Number(station.distanceKm ?? maxDistance), maxDistance) / maxDistance;
+      return { id: station.id, score: distanceScore * .5 + priceScore * .35 + serviceScore * .15 };
+    }).sort((left, right) => right.score - left.score)[0]?.id ?? null;
+  }, [location, officialStations]);
+  const recommendedStation = recommendedStationId
+    ? officialStations.find((station) => station.id === recommendedStationId) ?? null
+    : null;
 
   const toggleFavorite = (id: number | string) => {
     setFavorites((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
@@ -349,6 +434,68 @@ export default function StationExplorer({
     showToast(`Tu valoración de ${dimensionLabel}: ${value} estrellas`);
   };
 
+  const openConfirmation = (station: OfficialStation, category?: ConfirmationCategory) => {
+    setConfirmationStation(station);
+    setConfirmationCategory(category ?? (fuel === "lpg" ? "lpg_status" : fuel === "adblue" ? "adblue_status" : "bathroom"));
+  };
+
+  const submitConfirmation = async (status: ConfirmationStatus) => {
+    if (!confirmationStation || confirmationSaving) return;
+    setConfirmationSaving(true);
+    try {
+      const response = await fetch(`/api/stations/${encodeURIComponent(confirmationStation.id)}/confirmations`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          category: confirmationCategory,
+          status,
+          latitude: location?.latitude,
+          longitude: location?.longitude,
+          station: {
+            name: confirmationStation.name,
+            brand: confirmationStation.brand,
+            address: confirmationStation.address,
+            municipality: confirmationStation.municipality,
+            province: confirmationStation.province,
+            latE6: confirmationStation.latE6,
+            lngE6: confirmationStation.lngE6,
+          },
+        }),
+      });
+      if (response.status === 401) {
+        setConfirmationStation(null);
+        await openLogin();
+        return;
+      }
+      if (!response.ok) throw new Error("confirmation-failed");
+      const payload = await response.json() as { confirmation: { createdAt: number; proximityVerified: boolean } };
+      const fields: Partial<OfficialStation> = confirmationCategory === "lpg_status" || confirmationCategory === "adblue_status"
+        ? ((confirmationCategory === `${fuel}_status`) ? {
+            fuelCommunityStatus: status,
+            fuelCommunityAt: payload.confirmation.createdAt,
+            fuelCommunityNearby: payload.confirmation.proximityVerified,
+          } : {})
+        : confirmationCategory === "bathroom"
+          ? { bathroomStatus: status, bathroomStatusAt: payload.confirmation.createdAt }
+          : confirmationCategory === "coffee"
+            ? { coffeeStatus: status, coffeeStatusAt: payload.confirmation.createdAt }
+            : confirmationCategory === "restaurant"
+              ? { restaurantStatus: status, restaurantStatusAt: payload.confirmation.createdAt }
+              : { cleanlinessStatus: status, cleanlinessStatusAt: payload.confirmation.createdAt };
+      setOfficialState((current) => ({
+        ...current,
+        stations: current.stations.map((station) => station.id === confirmationStation.id ? { ...station, ...fields } : station),
+      }));
+      setSessionUser((current) => ({ signedIn: true, displayName: current.displayName }));
+      setConfirmationStation(null);
+      showToast(payload.confirmation.proximityVerified ? "Confirmación guardada · cercanía comprobada" : "Confirmación guardada");
+    } catch {
+      showToast("No se pudo guardar la confirmación");
+    } finally {
+      setConfirmationSaving(false);
+    }
+  };
+
   const formatPrice = (micros: number | null) => micros === null
     ? "—"
     : `${(micros / 1_000_000).toLocaleString("es-ES", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} €`;
@@ -356,6 +503,28 @@ export default function StationExplorer({
   const formatOfficialTime = (timestamp: number | null) => timestamp
     ? new Date(timestamp).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
     : "sin hora";
+
+  const recentConfirmation = (status?: ConfirmationStatus | null, timestamp?: number | null) => {
+    if (!status || !timestamp) return null;
+    const negative = status === "no_product" || status === "broken" || status === "closed" || status === "dirty" || status === "poor";
+    return clockNow > 0 && clockNow - timestamp <= (negative ? 6 : 24) * 60 * 60 * 1000 ? status : null;
+  };
+
+  const confirmationAge = (timestamp?: number | null) => {
+    if (!timestamp) return "";
+    const minutes = Math.max(1, Math.round((clockNow - timestamp) / 60_000));
+    return minutes < 60 ? `hace ${minutes} min` : `hace ${Math.round(minutes / 60)} h`;
+  };
+
+  const serviceStatusText = (status?: ConfirmationStatus | null, timestamp?: number | null) => {
+    const recent = recentConfirmation(status, timestamp);
+    if (recent === "clean") return "Limpio ahora";
+    if (recent === "good") return "Abierto y bien";
+    if (recent === "dirty") return "Aviso: sucio";
+    if (recent === "poor") return "Aviso reciente";
+    if (recent === "closed") return "Cerrado ahora";
+    return null;
+  };
 
   const stationHighlights = (station: OfficialStation) => {
     const highlights = [{
@@ -502,9 +671,18 @@ export default function StationExplorer({
         ) : null}
         {officialLoading ? <div className="official-loading"><span /><span /><span /></div> : null}
 
+        {recommendedStation && !officialLoading ? (
+          <div className="recommendation-card">
+            <Sparkles size={19} />
+            <div><span>NUESTRA PROPUESTA CERCA DE TI</span><strong>{recommendedStation.name}</strong><small>{Number(recommendedStation.distanceKm).toFixed(1)} km · {formatPrice(recommendedStation.priceMicros)} · equilibrio entre cercanía, precio y valoraciones disponibles</small></div>
+            <a href={`#station-${recommendedStation.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`}>Ver</a>
+          </div>
+        ) : null}
+
         <div className="official-list">
           {visibleOfficialStations.map((station) => (
-            <article className="official-card" key={station.id}>
+            <article className={`official-card ${recommendedStationId === station.id ? "recommended" : ""}`} id={`station-${station.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`} key={station.id}>
+              {recommendedStationId === station.id ? <span className="recommended-ribbon"><Sparkles size={11} /> Mejor equilibrio</span> : null}
               <div className="official-card-head">
                 <div className="station-logo official">{(station.brand || station.name).slice(0, 1)}</div>
                 <div>
@@ -520,13 +698,21 @@ export default function StationExplorer({
                 {stationHighlights(station).map((item) => <div className={item.className} key={item.label}><span>{item.label}</span><strong>{item.value}</strong><small>{item.detail}</small></div>)}
               </div>
               <div className="official-source"><Check size={13} /> MITECO · {formatOfficialTime(station.priceObservedAt)}</div>
+              {(fuel === "lpg" || fuel === "adblue") && recentConfirmation(station.fuelCommunityStatus, station.fuelCommunityAt) ? (
+                <div className={`fuel-confirmation ${station.fuelCommunityStatus === "working" ? "positive" : "warning"}`}>
+                  {station.fuelCommunityStatus === "working" ? <ShieldCheck size={15} /> : <X size={15} />}
+                  <span><strong>{station.fuelCommunityStatus === "working" ? `${selectedFuel.label} confirmado funcionando` : station.fuelCommunityStatus === "broken" ? `Aviso: surtidor de ${selectedFuel.label} averiado` : `Aviso: sin ${selectedFuel.label}`}</strong><small>Un aviso comunitario · {confirmationAge(station.fuelCommunityAt)}{station.fuelCommunityNearby ? " · cercanía comprobada" : ""}</small></span>
+                </div>
+              ) : null}
               <div className="community-scores" aria-label="Valoraciones de servicios">
                 {[
-                  { code: "bathroom" as const, label: "Baños", icon: <Bath size={14} />, rating: station.bathroomRating, count: station.bathroomCount },
-                  { code: "coffee" as const, label: "Café", icon: <Coffee size={14} />, rating: station.coffeeRating, count: station.coffeeCount },
-                  { code: "cleanliness" as const, label: "Limpieza", icon: <Sparkles size={14} />, rating: station.cleanlinessRating, count: station.cleanlinessCount },
-                ].map((service) => <button key={service.code} onClick={() => { setRatingStation(station.id); setRatingDimension(service.code); }}><span>{service.icon}{service.label}</span><strong>{service.count ? `${Number(service.rating).toFixed(1)} · ${service.count}` : "Valorar"}</strong></button>)}
+                  { code: "bathroom" as const, label: "Baños", icon: <Bath size={14} />, rating: station.bathroomRating, count: station.bathroomCount, status: station.bathroomStatus, statusAt: station.bathroomStatusAt },
+                  { code: "coffee" as const, label: "Café", icon: <Coffee size={14} />, rating: station.coffeeRating, count: station.coffeeCount, status: station.coffeeStatus, statusAt: station.coffeeStatusAt },
+                  { code: "restaurant" as const, label: "Restaurante", icon: <UtensilsCrossed size={14} />, rating: null, count: 0, status: station.restaurantStatus, statusAt: station.restaurantStatusAt },
+                  { code: "cleanliness" as const, label: "Limpieza", icon: <Sparkles size={14} />, rating: station.cleanlinessRating, count: station.cleanlinessCount, status: station.cleanlinessStatus, statusAt: station.cleanlinessStatusAt },
+                ].map((service) => <button key={service.code} onClick={() => openConfirmation(station, service.code)}><span>{service.icon}{service.label}</span><strong>{serviceStatusText(service.status, service.statusAt) || (service.count ? `${Number(service.rating).toFixed(1)} · ${service.count}` : "Confirmar")}</strong></button>)}
               </div>
+              <button className="confirm-now" onClick={() => openConfirmation(station)}><LocateFixed size={16} /> Confirmar GLP, AdBlue o servicios <span>10 s</span></button>
               <div className="official-actions">
                 <a href={`https://www.google.com/maps/search/?api=1&query=${station.latE6 / 1_000_000},${station.lngE6 / 1_000_000}`} target="_blank" rel="noreferrer"><Navigation size={16} /> Cómo llegar</a>
                 <button onClick={() => { setRatingStation(ratingStation === station.id ? null : station.id); setRatingDimension("overall"); }}><Star size={16} /> Valorar parada</button>
@@ -572,6 +758,28 @@ export default function StationExplorer({
         <button onClick={() => showToast(`${favorites.length} paradas guardadas`)}><Bookmark size={21} /><span>Guardadas</span></button>
         <button onClick={openLogin}><UserRound size={21} /><span>Perfil</span></button>
       </nav>
+
+      {confirmationStation ? (
+        <div className="overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmationStation(null); }}>
+          <section className="confirmation-sheet" role="dialog" aria-modal="true" aria-label={`Confirmar servicios en ${confirmationStation.name}`}>
+            <div className="sheet-grabber" />
+            <div className="modal-title"><div><span>CONFIRMACIÓN RÁPIDA</span><h2>¿Qué has encontrado?</h2></div><button onClick={() => setConfirmationStation(null)} aria-label="Cerrar"><X /></button></div>
+            <p className="confirmation-station"><MapPin size={14} /> {confirmationStation.name}</p>
+            <div className="confirmation-categories" aria-label="Qué quieres confirmar">
+              {confirmationCategories.map((option) => <button className={confirmationCategory === option.code ? "active" : ""} key={option.code} onClick={() => setConfirmationCategory(option.code)}>{option.label}</button>)}
+            </div>
+            <div className="confirmation-answers">
+              {confirmationOptions[confirmationCategory].map((option) => <button className={option.tone} disabled={confirmationSaving} key={option.status} onClick={() => submitConfirmation(option.status)}><span>{option.label}</span><Check size={17} /></button>)}
+            </div>
+            <div className={`proximity-box ${location ? "ready" : ""}`}>
+              <LocateFixed size={18} />
+              <div><strong>{location ? "Cercanía lista para comprobar" : "Haz más fiable tu aviso"}</strong><span>{location ? "El servidor comprueba que estás cerca y descarta inmediatamente las coordenadas." : "Podemos comprobar que estás cerca. Tu ubicación no se guarda."}</span></div>
+              {!location ? <button onClick={useMyLocation} disabled={locationLoading}>{locationLoading ? "…" : "Comprobar"}</button> : null}
+            </div>
+            <small className="confirmation-note"><ShieldCheck size={13} /> La confirmación es temporal y nunca sustituye el dato oficial de MITECO.</small>
+          </section>
+        </div>
+      ) : null}
 
       {filterOpen ? (
         <div className="overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setFilterOpen(false); }}>

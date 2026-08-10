@@ -69,6 +69,7 @@ export async function GET(request: Request) {
   }
   const requiresLpg = required.includes("lpg") ? 1 : 0;
   const requiresAdblue = required.includes("adblue") ? 1 : 0;
+  const communityFuelCategory = fuel === "lpg" ? "lpg_status" : fuel === "adblue" ? "adblue_status" : "none";
   const queryLike = query ? `%${query.toLocaleLowerCase("es")}%` : null;
   const latDelta = hasLocation ? radiusKm / 111 : 0;
   const lngDelta = hasLocation ? radiusKm / (111 * Math.max(0.2, Math.cos(latitude * Math.PI / 180))) : 0;
@@ -104,6 +105,12 @@ export async function GET(request: Request) {
       (SELECT COUNT(*) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'coffee') AS coffeeCount,
       (SELECT ROUND(AVG(sr.value), 1) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'cleanliness') AS cleanlinessRating,
       (SELECT COUNT(*) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'cleanliness') AS cleanlinessCount,
+      fuel_check.latest_status AS fuelCommunityStatus, fuel_check.latest_at AS fuelCommunityAt,
+      fuel_check.latest_proximity_verified AS fuelCommunityNearby,
+      bathroom_check.latest_status AS bathroomStatus, bathroom_check.latest_at AS bathroomStatusAt,
+      coffee_check.latest_status AS coffeeStatus, coffee_check.latest_at AS coffeeStatusAt,
+      restaurant_check.latest_status AS restaurantStatus, restaurant_check.latest_at AS restaurantStatusAt,
+      cleanliness_check.latest_status AS cleanlinessStatus, cleanliness_check.latest_at AS cleanlinessStatusAt,
       COUNT(*) OVER() AS totalMatches
     FROM stations s
     INNER JOIN station_current_prices p
@@ -113,6 +120,11 @@ export async function GET(request: Request) {
     LEFT JOIN station_current_prices adblue
       ON adblue.station_id = s.id AND adblue.fuel_type_id = 'adblue'
     LEFT JOIN data_sources ds ON ds.id = 'miteco-prices'
+    LEFT JOIN station_confirmation_summaries fuel_check ON fuel_check.station_id = s.id AND fuel_check.category = '${communityFuelCategory}'
+    LEFT JOIN station_confirmation_summaries bathroom_check ON bathroom_check.station_id = s.id AND bathroom_check.category = 'bathroom'
+    LEFT JOIN station_confirmation_summaries coffee_check ON coffee_check.station_id = s.id AND coffee_check.category = 'coffee'
+    LEFT JOIN station_confirmation_summaries restaurant_check ON restaurant_check.station_id = s.id AND restaurant_check.category = 'restaurant'
+    LEFT JOIN station_confirmation_summaries cleanliness_check ON cleanliness_check.station_id = s.id AND cleanliness_check.category = 'cleanliness'
     WHERE s.status = 'active'
       AND (? IS NULL OR lower(s.province) = lower(?))
       AND (? IS NULL OR lower(coalesce(s.name, '') || ' ' || coalesce(s.brand, '') || ' ' || coalesce(s.address, '') || ' ' || coalesce(s.municipality, '') || ' ' || coalesce(s.province, '')) LIKE ?)
@@ -195,6 +207,17 @@ export async function GET(request: Request) {
             coffeeCount: 0,
             cleanlinessRating: null,
             cleanlinessCount: 0,
+            fuelCommunityStatus: null,
+            fuelCommunityAt: null,
+            fuelCommunityNearby: 0,
+            bathroomStatus: null,
+            bathroomStatusAt: null,
+            coffeeStatus: null,
+            coffeeStatusAt: null,
+            restaurantStatus: null,
+            restaurantStatusAt: null,
+            cleanlinessStatus: null,
+            cleanlinessStatusAt: null,
             distanceKm: hasLocation ? haversineKm(latitude, longitude, lat, lng) : null,
           };
         })

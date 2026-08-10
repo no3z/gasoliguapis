@@ -77,7 +77,12 @@ button, select { cursor: pointer; }
 .official-context { display: flex; align-items: flex-start; gap: 6px; margin: -4px 6px 15px; color: #778282; font-size: 10px; line-height: 1.4; }
 .official-context svg { flex: 0 0 auto; color: var(--green); }
 .official-list { display: grid; gap: 11px; }
-.official-card { overflow: hidden; padding: 15px; border: 1px solid #dfe7e1; border-radius: 20px; background: #fff; box-shadow: 0 8px 20px rgba(37,47,45,.055); }
+.recommendation-card { display: grid; grid-template-columns: 32px 1fr auto; align-items: center; gap: 9px; margin: 0 0 12px; padding: 11px 12px; border-radius: 15px; color: #fff; background: linear-gradient(135deg, #168263, #11654f); box-shadow: 0 8px 18px rgba(22,130,99,.18); }
+.recommendation-card > svg { padding: 7px; width: 32px; height: 32px; border-radius: 10px; color: var(--ink); background: #bce8d3; }
+.recommendation-card div { min-width: 0; }.recommendation-card span, .recommendation-card strong, .recommendation-card small { display: block; }.recommendation-card span { color: #bce8d3; font-size: 7px; font-weight: 900; letter-spacing: .8px; }.recommendation-card strong { margin-top: 2px; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }.recommendation-card small { margin-top: 2px; color: #e1f3ea; font-size: 8px; line-height: 1.35; }.recommendation-card a { padding: 7px 9px; border-radius: 9px; color: var(--ink); background: #fff; font-size: 9px; font-weight: 850; text-decoration: none; }
+.official-card { position: relative; overflow: hidden; padding: 15px; border: 1px solid #dfe7e1; border-radius: 20px; background: #fff; box-shadow: 0 8px 20px rgba(37,47,45,.055); scroll-margin-top: 14px; }
+.official-card.recommended { border-color: #94cfb7; box-shadow: 0 8px 23px rgba(22,130,99,.11); }
+.recommended-ribbon { display: flex; align-items: center; gap: 4px; width: max-content; margin: -15px 0 10px -15px; padding: 5px 10px; border-radius: 0 0 9px 0; color: #fff; background: var(--green); font-size: 8px; font-weight: 850; letter-spacing: .35px; }
 .official-card-head { display: grid; grid-template-columns: 43px 1fr 35px; align-items: start; gap: 10px; }
 .station-logo.official { --brand-accent: var(--green); background: linear-gradient(145deg, #1d9674, #116a54); }
 .official-card-head > div:nth-child(2) { min-width: 0; }
@@ -97,10 +102,13 @@ button, select { cursor: pointer; }
 .official-price-panel .info { color: #546d66; background: #edf7f2; }.official-price-panel .info strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .official-source { display: flex; align-items: center; justify-content: center; gap: 4px; margin: 8px 0 0; color: #87908e; font-size: 8px; }
 .official-source svg { color: var(--green); }
-.community-scores { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 10px; }
+.fuel-confirmation { display: flex; align-items: flex-start; gap: 7px; margin-top: 9px; padding: 9px 10px; border-radius: 10px; color: #315f51; background: #edf8f2; }
+.fuel-confirmation.warning { color: #8b4436; background: #fff0ec; }.fuel-confirmation > svg { flex: 0 0 auto; }.fuel-confirmation span, .fuel-confirmation strong, .fuel-confirmation small { display: block; }.fuel-confirmation strong { font-size: 9px; }.fuel-confirmation small { margin-top: 2px; font-size: 8px; opacity: .8; }
+.community-scores { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; margin-top: 10px; }
 .community-scores button { min-width: 0; padding: 7px 5px; border: 1px solid #e4e2dc; border-radius: 9px; color: #687573; background: #faf9f6; text-align: left; }
 .community-scores span { display: flex; align-items: center; justify-content: center; gap: 3px; font-size: 8px; }.community-scores span svg { color: var(--green); }
 .community-scores strong { display: block; margin-top: 3px; overflow: hidden; color: var(--ink); font-size: 8px; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.confirm-now { width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; height: 38px; margin-top: 8px; border: 0; border-radius: 11px; color: #0f644d; background: #def2e8; font-size: 10px; font-weight: 850; }.confirm-now span { margin-left: 3px; padding: 2px 5px; border-radius: 8px; color: #fff; background: var(--green); font-size: 7px; }
 .official-actions { display: grid; grid-template-columns: 1.25fr 1fr; gap: 7px; margin-top: 11px; }
 .official-actions a, .official-actions button { display: flex; align-items: center; justify-content: center; gap: 6px; height: 39px; border: 1px solid var(--ink); border-radius: 11px; font-size: 10px; font-weight: 800; text-decoration: none; }
 .official-actions a { color: #fff; background: var(--ink); }
@@ -197,7 +205,7 @@ button, select { cursor: pointer; }
 .contribute span { display: none; }
 
 .overlay { position: fixed; z-index: 60; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding: 0; background: rgba(11,26,27,.52); backdrop-filter: blur(4px); animation: fade-in .2s ease; }
-.detail-sheet, .filter-sheet { width: min(100%, 510px); max-height: 91vh; overflow: auto; border-radius: 27px 27px 0 0; background: var(--paper); animation: slide-up .3s ease; }
+.detail-sheet, .filter-sheet, .confirmation-sheet { width: min(100%, 510px); max-height: 91vh; overflow: auto; border-radius: 27px 27px 0 0; background: var(--paper); animation: slide-up .3s ease; }
 .sheet-grabber { width: 45px; height: 5px; margin: 10px auto 5px; border-radius: 5px; background: #d6d3cd; }
 .sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 6px 16px 12px; border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 750; }
 .sheet-head button, .modal-title button { display: grid; place-items: center; width: 38px; height: 38px; border: 0; border-radius: 50%; background: #f4f1ea; }
@@ -218,6 +226,13 @@ button, select { cursor: pointer; }
 
 .filter-sheet { padding: 0 19px 28px; }
 .modal-title { display: flex; align-items: center; justify-content: space-between; }.modal-title h2 { margin: 10px 0 0; font-size: 25px; letter-spacing: -.8px; }.filter-sheet > p { margin: 3px 0 18px; color: var(--muted); font-size: 13px; }
+.confirmation-sheet { padding: 0 18px max(24px, env(safe-area-inset-bottom)); }
+.confirmation-sheet .modal-title > div > span { color: var(--green); font-size: 8px; font-weight: 900; letter-spacing: 1px; }.confirmation-sheet .modal-title h2 { margin-top: 3px; }
+.confirmation-station { display: flex; align-items: center; gap: 5px; margin: 5px 0 15px; color: var(--muted); font-size: 11px; }.confirmation-station svg { color: var(--orange); }
+.confirmation-categories { display: flex; gap: 6px; margin: 0 -18px 14px; padding: 0 18px 3px; overflow-x: auto; scrollbar-width: none; }.confirmation-categories button { flex: 0 0 auto; padding: 8px 10px; border: 1px solid #dfddd5; border-radius: 17px; color: #657271; background: #fff; font-size: 9px; font-weight: 800; }.confirmation-categories button.active { color: #fff; border-color: var(--ink); background: var(--ink); }
+.confirmation-answers { display: grid; gap: 7px; }.confirmation-answers button { display: flex; align-items: center; justify-content: space-between; min-height: 48px; padding: 0 13px; border: 1px solid #dcdad3; border-radius: 13px; background: #fff; font-size: 11px; font-weight: 820; }.confirmation-answers button.positive { color: #116c52; border-color: #b8dfcf; background: #eff9f4; }.confirmation-answers button.negative { color: #9a4636; border-color: #f0c8be; background: #fff3ef; }.confirmation-answers button:disabled { cursor: wait; opacity: .55; }
+.proximity-box { display: grid; grid-template-columns: 27px 1fr auto; align-items: center; gap: 8px; margin-top: 13px; padding: 10px; border-radius: 12px; color: #665c43; background: #fff7df; }.proximity-box.ready { color: #255e4e; background: #eaf7f1; }.proximity-box > svg { color: var(--orange); }.proximity-box.ready > svg { color: var(--green); }.proximity-box strong, .proximity-box span { display: block; }.proximity-box strong { font-size: 9px; }.proximity-box span { margin-top: 2px; font-size: 8px; line-height: 1.35; }.proximity-box button { padding: 7px 8px; border: 0; border-radius: 8px; color: #fff; background: var(--ink); font-size: 8px; font-weight: 850; }
+.confirmation-note { display: flex; align-items: flex-start; gap: 5px; margin-top: 11px; color: #7b8584; font-size: 8px; line-height: 1.4; }.confirmation-note svg { flex: 0 0 auto; color: var(--green); }
 .filter-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }.filter-options button { display: flex; align-items: center; justify-content: space-between; min-height: 46px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; background: #faf8f4; font-size: 11px; font-weight: 700; text-align: left; }.filter-options button svg { opacity: 0; }.filter-options button.selected { color: var(--green); border-color: #acd8c7; background: #edf7f2; }.filter-options button.selected svg { opacity: 1; }.filter-options button:disabled { cursor: not-allowed; opacity: .48; }.filter-options button small { color: #8a9492; font-size: 8px; }
 .primary-action { width: 100%; height: 49px; margin-top: 17px; border: 0; border-radius: 14px; color: #fff; background: var(--ink); font-weight: 800; }
 
@@ -325,7 +340,7 @@ button, select { cursor: pointer; }
   .guide-grid, .method-steps { grid-template-columns: 1fr 1fr; }.calculator-fields { grid-template-columns: 1fr 1fr; }.calculator-field:first-child { grid-column: 1 / -1; }
   .guide-footer { grid-template-columns: 1fr 1fr; padding: 38px 56px; }.guide-footer nav { grid-template-columns: 1fr 1fr; }
   .bottom-nav { display: none; }.contribute { left: auto; right: max(28px, calc((100vw - 1180px) / 2 + 28px)); bottom: 28px; display: flex; width: auto; height: 48px; padding: 0 17px; border-radius: 14px; }.contribute span { display: inline; margin-left: 7px; font-size: 12px; font-weight: 800; }
-  .detail-sheet, .filter-sheet { border-radius: 27px; margin: auto; max-height: min(88vh, 760px); }.filter-sheet { max-width: 510px; }.detail-sheet { max-width: 580px; }.overlay { align-items: center; padding: 24px; }
+  .detail-sheet, .filter-sheet, .confirmation-sheet { border-radius: 27px; margin: auto; max-height: min(88vh, 760px); }.filter-sheet, .confirmation-sheet { max-width: 510px; }.detail-sheet { max-width: 580px; }.overlay { align-items: center; padding: 24px; }
 }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; } }

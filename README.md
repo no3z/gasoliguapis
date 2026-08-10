@@ -13,8 +13,10 @@ Aplicación móvil para encontrar la mejor parada en carretera por sentido, desv
 - Búsqueda real en toda España, las 52 provincias o un radio de 75 km usando ubicación aproximada.
 - Consulta por nombre, municipio o dirección antes de limitar resultados, total de coincidencias y hasta 100 estaciones por búsqueda.
 - Ordenación por precio o cercanía y carga progresiva en el dispositivo.
+- Propuesta automática de la parada con mejor equilibrio entre cercanía, precio y valoraciones disponibles cuando el usuario comparte su ubicación.
 - Snapshot estático compacto de GLP y AdBlue como respaldo gratuito si la base o la fuente oficial no responden durante una visita.
 - Valoraciones separadas de parada, baños, café y limpieza; no se mezclan en una única nota genérica.
+- Confirmaciones rápidas de GLP, AdBlue, baños, cafetería, restaurante y limpieza, separadas del dato oficial y con cercanía opcional comprobada sin almacenar coordenadas.
 - Votos 1–5 autenticados con la identidad disponible en Sites; el esquema conserva soporte multi-proveedor para Google/Facebook.
 - Google/Facebook no simulan un acceso real hasta confirmar callbacks y configurar credenciales compatibles.
 - Portada cacheable sin consulta de identidad; la sesión se comprueba únicamente al abrir el perfil o escribir.

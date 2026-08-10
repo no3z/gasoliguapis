@@ -163,6 +163,28 @@ export const stationRatings = sqliteTable("station_ratings", {
   index("idx_ratings_station_dimension").on(table.stationId, table.dimensionId),
 ]);
 
+export const stationConfirmations = sqliteTable("station_confirmations", {
+  id: text("id").primaryKey(),
+  stationId: text("station_id").notNull().references(() => stations.id),
+  userId: text("user_id").notNull().references(() => users.id),
+  category: text("category", { enum: ["lpg_status", "adblue_status", "bathroom", "coffee", "restaurant", "cleanliness"] }).notNull(),
+  status: text("status", { enum: ["working", "no_product", "broken", "open", "closed", "clean", "dirty", "good", "poor"] }).notNull(),
+  proximityVerified: integer("proximity_verified", { mode: "boolean" }).notNull().default(false),
+  dayBucket: integer("day_bucket").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [
+  uniqueIndex("idx_confirmations_user_station_category_day").on(table.stationId, table.userId, table.category, table.dayBucket),
+  index("idx_confirmations_station_category_created").on(table.stationId, table.category, table.createdAt),
+]);
+
+export const stationConfirmationSummaries = sqliteTable("station_confirmation_summaries", {
+  stationId: text("station_id").notNull().references(() => stations.id),
+  category: text("category", { enum: ["lpg_status", "adblue_status", "bathroom", "coffee", "restaurant", "cleanliness"] }).notNull(),
+  latestStatus: text("latest_status", { enum: ["working", "no_product", "broken", "open", "closed", "clean", "dirty", "good", "poor"] }).notNull(),
+  latestAt: integer("latest_at", { mode: "timestamp_ms" }).notNull(),
+  latestProximityVerified: integer("latest_proximity_verified", { mode: "boolean" }).notNull().default(false),
+}, (table) => [primaryKey({ columns: [table.stationId, table.category] })]);
+
 export const reviews = sqliteTable("reviews", {
   id: text("id").primaryKey(),
   stationId: text("station_id").notNull().references(() => stations.id),
