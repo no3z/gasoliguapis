@@ -1,31 +1,44 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { SITE_NAME, SITE_URL } from "./site-config";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://gasoliguapis.es"),
-  title: { default: "Gasoliguapis", template: "%s · Gasoliguapis" },
-  description: "La guía de paradas en carretera que puntúa lo que de verdad importa.",
+  metadataBase: new URL(SITE_URL),
+  applicationName: SITE_NAME,
+  title: {
+    default: "Gasolineras con GLP, AdBlue, baños y café | Gasoliguapis",
+    template: "%s | Gasoliguapis",
+  },
+  description: "Compara precios oficiales y encuentra gasolineras con GLP, AdBlue, baños cuidados y buen café en las carreteras de España.",
+  alternates: { canonical: "/" },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 },
+  },
   icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
+  manifest: "/manifest.webmanifest",
   openGraph: {
     type: "website",
     locale: "es_ES",
-    siteName: "Gasoliguapis",
-    title: "Gasoliguapis — Tu mejor parada en carretera",
-    description: "Café rico, baños limpios y precios actualizados. Todo en una sola parada.",
-    images: [{ url: "/og.png", width: 1731, height: 909, alt: "Gasoliguapis, tu mejor parada en carretera" }],
+    url: "/",
+    siteName: SITE_NAME,
+    title: "Gasoliguapis — Decide dónde merece la pena parar",
+    description: "Precios oficiales, GLP, AdBlue, baños y café en las carreteras de España.",
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "Gasoliguapis, tu mejor parada en carretera" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Gasoliguapis — Tu mejor parada en carretera",
-    description: "Café rico, baños limpios y precios al día.",
+    title: "Gasoliguapis — Decide dónde merece la pena parar",
+    description: "Precios oficiales, GLP, AdBlue, baños y café en carretera.",
     images: ["/og.png"],
   },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="es"><body className={`${geistSans.variable} ${geistMono.variable}`}>{children}</body></html>;
+  return <html lang="es-ES"><body className={`${geistSans.variable} ${geistMono.variable}`}>{children}</body></html>;
 }

@@ -4,14 +4,16 @@ Aplicación móvil para encontrar la mejor parada en carretera por sentido, desv
 
 ## Estado
 
-- Experiencia móvil y escritorio con lista, mapa, filtros, favoritos y fichas de estación.
-- La interfaz visible utiliza datos etiquetados como demostración.
+- Experiencia móvil y escritorio con catálogo oficial, filtros, favoritos y valoraciones.
+- Las fichas ficticias se han retirado de la superficie indexable.
 - Esquema D1 de 20 tablas para catálogo, red viaria, precios, comunidad, fotos y moderación.
-- Ingesta paginada y protegida del censo/precios oficiales de MITECO.
-- R2 reservado para fotos aportadas por usuarios.
+- Ingesta paginada y protegida del censo/precios oficiales de MITECO, con un único snapshot por ciclo en R2 y escrituras D1 solo cuando cambia un dato.
+- Respuestas oficiales cacheables en CDN durante 30 minutos y tolerantes a caídas temporales del proveedor.
 - Filtros oficiales por Gasóleo A, Gasolina 95, GLP y AdBlue, con requisitos combinables GLP + AdBlue.
 - Votos 1–5 autenticados con la identidad disponible en Sites; el esquema conserva soporte multi-proveedor para Google/Facebook.
 - Google/Facebook no simulan un acceso real hasta confirmar callbacks y configurar credenciales compatibles.
+- Portada cacheable sin consulta de identidad; la sesión se comprueba únicamente al abrir el perfil o escribir.
+- SEO técnico con canónicas, robots, sitemap, manifest, datos estructurados y páginas editoriales sobre GLP, AdBlue, metodología y ahorro neto.
 
 ## Desarrollo
 
@@ -28,6 +30,8 @@ Las variables locales se documentan en `.env.example`. Los secretos alojados se 
 
 ## Datos
 
-`POST /api/internal/sync-miteco?offset=0&limit=250` importa un tramo del censo oficial. Requiere `Authorization: Bearer <INGEST_SECRET>` y debe repetirse con el `nextOffset` devuelto. Los clientes leen datos normalizados desde `GET /api/stations`.
+`POST /api/internal/sync-miteco?offset=0&limit=250` descarga una vez el censo oficial, conserva el snapshot en R2 e importa un tramo. Requiere `Authorization: Bearer <INGEST_SECRET>` y debe repetirse con el `nextOffset` devuelto; los tramos siguientes reutilizan el snapshot. Los clientes leen datos normalizados desde `GET /api/stations`.
+
+Para que los buscadores puedan indexar las páginas, el Site debe tener acceso público. Mientras siga protegido por inicio de sesión, Google recibirá un `401` aunque `robots.txt` y el sitemap estén preparados.
 
 La investigación, licencias, estrategia de cobertura, comunidad y monetización se encuentran en `docs/product-data-strategy.md`.

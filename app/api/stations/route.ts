@@ -52,9 +52,9 @@ export async function GET(request: Request) {
     const rows = await database.prepare(`SELECT
       s.id, s.name, s.brand, s.address, s.municipality, s.province,
       s.lat_e6 AS latE6, s.lng_e6 AS lngE6,
-      p.price_micros AS priceMicros, p.currency, p.observed_at AS priceObservedAt,
-      lpg.price_micros AS lpgPriceMicros, lpg.observed_at AS lpgObservedAt,
-      adblue.price_micros AS adbluePriceMicros, adblue.observed_at AS adblueObservedAt
+      p.price_micros AS priceMicros, p.currency, COALESCE(ds.updated_at, p.observed_at) AS priceObservedAt,
+      lpg.price_micros AS lpgPriceMicros, COALESCE(ds.updated_at, lpg.observed_at) AS lpgObservedAt,
+      adblue.price_micros AS adbluePriceMicros, COALESCE(ds.updated_at, adblue.observed_at) AS adblueObservedAt
     FROM stations s
     INNER JOIN station_current_prices p
       ON p.station_id = s.id AND p.fuel_type_id = ?
@@ -62,6 +62,7 @@ export async function GET(request: Request) {
       ON lpg.station_id = s.id AND lpg.fuel_type_id = 'lpg'
     LEFT JOIN station_current_prices adblue
       ON adblue.station_id = s.id AND adblue.fuel_type_id = 'adblue'
+    LEFT JOIN data_sources ds ON ds.id = 'miteco-prices'
     WHERE s.status = 'active'
       AND (? IS NULL OR lower(s.province) = lower(?))
       AND (? = 0 OR lpg.station_id IS NOT NULL)
@@ -80,7 +81,10 @@ export async function GET(request: Request) {
       type ProductPayload = { Fecha?: string; ListaEESSPrecio?: Array<Record<string, string>> };
       const productIds = [...new Set([PRODUCT_IDS[fuel], PRODUCT_IDS.lpg, PRODUCT_IDS.adblue])];
       const payloadEntries = await Promise.all(productIds.map(async (productId) => {
-        const response = await fetch(`${MITECO_PRODUCT_ENDPOINT}/${productId}`, { headers: { accept: "application/json" } });
+        const response = await fetch(`${MITECO_PRODUCT_ENDPOINT}/${productId}`, {
+          headers: { accept: "application/json" },
+          cf: { cacheEverything: true, cacheTtl: 1800 },
+        } as RequestInit & { cf: { cacheEverything: boolean; cacheTtl: number } });
         if (!response.ok) throw new Error(`MITECO ${response.status}`);
         return [productId, await response.json() as ProductPayload] as const;
       }));
@@ -135,5 +139,5 @@ export async function GET(request: Request) {
     delivery,
     data,
     attribution: "Origen de los datos: Ministerio para la Transición Ecológica y el Reto Demográfico",
-  }, { headers: { "cache-control": "public, max-age=60, s-maxage=300" } });
+  }, { headers: { "cache-control": "public, max-age=300, s-maxage=1800, stale-while-revalidate=86400, stale-if-error=86400" } });
 }

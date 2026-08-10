@@ -10,14 +10,21 @@ type Database = {
   batch: (statements: Prepared[]) => Promise<unknown>;
 };
 
+type Bucket = {
+  get: (key: string) => Promise<{ text: () => Promise<string> } | null>;
+  put: (key: string, value: string, options?: { httpMetadata?: { contentType?: string }; customMetadata?: Record<string, string> }) => Promise<unknown>;
+};
+
 type RuntimeEnv = {
   DB: Database;
+  MEDIA: Bucket;
   INGEST_SECRET?: string;
 };
 
 type OfficialStation = Record<string, string>;
 
 const ENDPOINT = "https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/";
+const SNAPSHOT_KEY = "official/miteco/latest.json";
 const FUELS = [
   ["gasoline_95_e5", "Gasolina 95 E5", "Precio Gasolina 95 E5"],
   ["gasoline_98_e5", "Gasolina 98 E5", "Precio Gasolina 98 E5"],
@@ -57,12 +64,25 @@ export async function POST(request: Request) {
   }
 
   const url = new URL(request.url);
-  const offset = Math.max(0, Number(url.searchParams.get("offset") || 0));
-  const limit = Math.min(300, Math.max(1, Number(url.searchParams.get("limit") || 250)));
-  const response = await fetch(ENDPOINT, { headers: { accept: "application/json" } });
-  if (!response.ok) return Response.json({ error: "La fuente oficial no respondió", status: response.status }, { status: 502 });
+  const requestedOffset = Number(url.searchParams.get("offset") || 0);
+  const requestedLimit = Number(url.searchParams.get("limit") || 250);
+  const offset = Number.isFinite(requestedOffset) ? Math.max(0, Math.floor(requestedOffset)) : 0;
+  const limit = Number.isFinite(requestedLimit) ? Math.min(300, Math.max(1, Math.floor(requestedLimit))) : 250;
+  let payload: { Fecha?: string; ListaEESSPrecio?: OfficialStation[] };
 
-  const payload = await response.json() as { Fecha?: string; ListaEESSPrecio?: OfficialStation[] };
+  if (offset === 0) {
+    const response = await fetch(ENDPOINT, { headers: { accept: "application/json" } });
+    if (!response.ok) return Response.json({ error: "La fuente oficial no respondió", status: response.status }, { status: 502 });
+    payload = await response.json() as typeof payload;
+    await runtime.MEDIA.put(SNAPSHOT_KEY, JSON.stringify(payload), {
+      httpMetadata: { contentType: "application/json" },
+      customMetadata: { source: "MITECO", fetchedAt: new Date().toISOString() },
+    });
+  } else {
+    const snapshot = await runtime.MEDIA.get(SNAPSHOT_KEY);
+    if (!snapshot) return Response.json({ error: "No hay un snapshot activo; reinicia la sincronización desde offset 0" }, { status: 409 });
+    payload = JSON.parse(await snapshot.text()) as typeof payload;
+  }
   const allStations = payload.ListaEESSPrecio || [];
   const selected = allStations.slice(offset, offset + limit);
   const observedAt = officialDate(payload.Fecha);
@@ -98,28 +118,37 @@ export async function POST(request: Request) {
           address=excluded.address, municipality=excluded.municipality, province=excluded.province,
           postal_code=excluded.postal_code, lat_e6=excluded.lat_e6, lng_e6=excluded.lng_e6,
           geo_cell=excluded.geo_cell, status='active', source_updated_at=excluded.source_updated_at,
-          updated_at=excluded.updated_at`).bind(
+          updated_at=excluded.updated_at
+        WHERE stations.name IS NOT excluded.name OR stations.brand IS NOT excluded.brand
+          OR stations.operator IS NOT excluded.operator OR stations.address IS NOT excluded.address
+          OR stations.municipality IS NOT excluded.municipality OR stations.province IS NOT excluded.province
+          OR stations.postal_code IS NOT excluded.postal_code OR stations.lat_e6 IS NOT excluded.lat_e6
+          OR stations.lng_e6 IS NOT excluded.lng_e6 OR stations.geo_cell IS NOT excluded.geo_cell
+          OR stations.status IS NOT 'active'`).bind(
             stationId, officialId, station.Rótulo || "Estación de servicio", station.Rótulo || null,
             station.Rótulo || null, station.Dirección || null, station.Municipio || null,
             station.Provincia || null, station["C.P."] || null,
             Math.round(lat * 1_000_000), Math.round(lng * 1_000_000), geoCell, observedAt, now, now,
           ));
 
-      // Replace the complete official price snapshot for this station so a
-      // product that disappears from the feed never remains as a stale match.
-      statements.push(runtime.DB.prepare(`DELETE FROM station_current_prices
-        WHERE station_id = ? AND source_id = 'miteco-prices'`).bind(stationId));
-
-      for (const [fuelId, , sourceField] of FUELS) {
+      const availablePrices = FUELS.flatMap(([fuelId, , sourceField]) => {
         const price = priceDecimal(station[sourceField]);
-        if (price === null || price <= 0) continue;
+        return price !== null && price > 0 ? [{ fuelId, price }] : [];
+      });
+      const retainedFuelIds = availablePrices.map(({ fuelId }) => fuelId);
+      const retainedClause = retainedFuelIds.length ? `AND fuel_type_id NOT IN (${retainedFuelIds.map(() => "?").join(",")})` : "";
+      statements.push(runtime.DB.prepare(`DELETE FROM station_current_prices
+        WHERE station_id = ? AND source_id = 'miteco-prices' ${retainedClause}`).bind(stationId, ...retainedFuelIds));
+
+      for (const { fuelId, price } of availablePrices) {
         pricesWritten += 1;
         statements.push(runtime.DB.prepare(`INSERT INTO station_current_prices
           (station_id, fuel_type_id, price_micros, currency, source_id, observed_at)
           VALUES (?, ?, ?, 'EUR', 'miteco-prices', ?)
           ON CONFLICT(station_id, fuel_type_id) DO UPDATE SET
             price_micros=excluded.price_micros, source_id=excluded.source_id, observed_at=excluded.observed_at
-          WHERE excluded.observed_at >= station_current_prices.observed_at`).bind(
+          WHERE excluded.price_micros IS NOT station_current_prices.price_micros
+             OR excluded.source_id IS NOT station_current_prices.source_id`).bind(
             stationId, fuelId, Math.round(price * 1_000_000), observedAt,
           ));
       }
@@ -128,6 +157,9 @@ export async function POST(request: Request) {
   }
 
   const nextOffset = offset + selected.length;
+  if (nextOffset >= allStations.length) {
+    await runtime.DB.prepare("UPDATE data_sources SET updated_at = ? WHERE id = 'miteco-prices'").bind(observedAt).run();
+  }
   return Response.json({
     sourceUpdatedAt: new Date(observedAt).toISOString(),
     total: allStations.length,
