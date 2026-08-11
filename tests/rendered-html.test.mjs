@@ -152,6 +152,8 @@ test("connects the filtered station list to an interactive map", async () => {
   assert.match(css, /rating-low/);
   assert.match(css, /rating-mid/);
   assert.match(css, /rating-high/);
+  assert.match(css, /\.map-stage\.advanced \{[^}]*height: clamp\(330px, 50dvh, 460px\)/);
+  assert.doesNotMatch(css, /\.map-stage\.advanced \{[^}]*height: calc\(100dvh/);
   assert.match(stationsApi, /sortParam === "rating"/);
   assert.match(stationsApi, /hasMapBounds/);
   assert.match(stationsApi, /kind: "map"/);
