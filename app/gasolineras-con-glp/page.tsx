@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import snapshot from "../../public/data/miteco-special-fuels.json";
 import GuideShell from "../guide-shell";
+import { PROVINCES } from "../provinces";
 import { DATA_SNAPSHOT_DATE, SITE_URL } from "../site-config";
 
 export const metadata: Metadata = {
@@ -17,6 +19,15 @@ const facts = [
 ];
 
 export default function GlpGuide() {
+  const provinceCounts = new Map<string, number>();
+  for (const station of snapshot.products.lpg) {
+    provinceCounts.set(station.province, (provinceCounts.get(station.province) ?? 0) + 1);
+  }
+  const coveredProvinces = PROVINCES
+    .map((province) => ({ ...province, count: provinceCounts.get(province.official) ?? 0 }))
+    .filter((province) => province.count > 0)
+    .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name, "es"));
+
   return (
     <GuideShell eyebrow="GUÍA DE AUTOGÁS" title="Gasolineras con GLP en España" lead="Consulta el precio oficial antes de salir y combina el filtro de GLP con AdBlue cuando necesites ambos productos en la misma parada.">
       <section className="guide-stats" aria-label="Cobertura de los datos">
@@ -43,6 +54,18 @@ export default function GlpGuide() {
           <li>Estado de baños, cafetería, accesibilidad y espacio para familias o campers.</li>
           <li>Fecha y origen de cada comprobación comunitaria.</li>
         </ul>
+      </section>
+
+      <section>
+        <h2>Gasolineras con GLP por provincia</h2>
+        <p>Entra en una provincia para abrir el mapa ya filtrado, comparar el precio mínimo, medio y máximo y consultar las estaciones más baratas.</p>
+        <div className="province-link-grid">
+          {coveredProvinces.map((province) => (
+            <Link href={`/gasolineras-con-glp/${province.slug}`} key={province.slug}>
+              <span>{province.name}</span><strong>{province.count}</strong>
+            </Link>
+          ))}
+        </div>
       </section>
 
       <aside className="source-note">Datos de precios procedentes del <a href="https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/" rel="noreferrer">servicio oficial de precios de carburantes</a>. Fecha del recuento: {DATA_SNAPSHOT_DATE}. <Link href="/metodologia">Consulta la metodología</Link>.</aside>

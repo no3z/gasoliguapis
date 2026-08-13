@@ -64,6 +64,23 @@ test("renders useful indexable GLP and savings pages", async () => {
   assert.match(calculatorHtml, /El cálculo se realiza en tu dispositivo/);
 });
 
+test("renders useful province-level GLP pages and lists them in the sitemap", async () => {
+  const [provinceResponse, sitemapResponse] = await Promise.all([
+    render("/gasolineras-con-glp/madrid"),
+    render("/sitemap.xml"),
+  ]);
+  assert.equal(provinceResponse.status, 200);
+  assert.equal(sitemapResponse.status, 200);
+  const provinceHtml = await provinceResponse.text();
+  const sitemapXml = await sitemapResponse.text();
+  assert.match(provinceHtml, /Gasolineras con GLP en Madrid: mapa y precios oficiales/);
+  assert.match(provinceHtml, /Precios de GLP en (?:<!-- -->)?Madrid/);
+  assert.match(provinceHtml, /precio mínimo/);
+  assert.match(provinceHtml, /GLP más barato en (?:<!-- -->)?Madrid/);
+  assert.match(sitemapXml, /gasolineras-con-glp\/madrid/);
+  assert.match(sitemapXml, /gasolineras-con-glp\/barcelona/);
+});
+
 test("keeps product metadata and removes the disposable starter", async () => {
   const [page, layout, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
@@ -82,6 +99,13 @@ test("keeps product metadata and removes the disposable starter", async () => {
   await access(new URL("../app/sitemap.ts", import.meta.url));
   await access(new URL("../app/manifest.ts", import.meta.url));
   await access(new URL(".openai/drizzle/0000_right_newton_destine.sql", templateRoot));
+});
+
+test("keeps ratings structured and does not expose a public comment flow", async () => {
+  const explorer = await readFile(new URL("../app/station-explorer.tsx", import.meta.url), "utf8");
+  assert.match(explorer, /Sin comentarios públicos/);
+  assert.match(explorer, /cada categoría admite un voto por usuario/);
+  assert.doesNotMatch(explorer, /textarea|submitComment|reviewBody/);
 });
 
 test("ships a compact official fallback for special fuels", async () => {

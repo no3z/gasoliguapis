@@ -21,10 +21,10 @@ Aplicación móvil para encontrar la mejor parada en carretera por sentido, desv
 - Snapshot estático compacto de GLP y AdBlue como respaldo gratuito si la base o la fuente oficial no responden durante una visita.
 - Valoraciones separadas de parada, baños, café y limpieza; no se mezclan en una única nota genérica.
 - Confirmaciones rápidas de GLP, AdBlue, baños, cafetería, restaurante y limpieza, separadas del dato oficial y con cercanía opcional comprobada sin almacenar coordenadas.
-- Votos 1–5 autenticados con la identidad disponible en Sites; el esquema conserva soporte multi-proveedor para Google/Facebook.
+- Votos 1–5 autenticados con la identidad disponible en Sites, sin comentarios públicos; el esquema conserva soporte multi-proveedor para Google/Facebook.
 - Google/Facebook no simulan un acceso real hasta confirmar callbacks y configurar credenciales compatibles.
 - Portada cacheable sin consulta de identidad; la sesión se comprueba únicamente al abrir el perfil o escribir.
-- SEO técnico con canónicas, robots, sitemap, manifest, datos estructurados y páginas editoriales sobre GLP, AdBlue, metodología y ahorro neto.
+- SEO técnico con canónicas, robots, sitemap, manifest, datos estructurados, páginas provinciales de GLP y contenidos sobre GLP, AdBlue, metodología y ahorro neto.
 
 ## Desarrollo
 

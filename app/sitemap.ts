@@ -1,4 +1,6 @@
 import type { MetadataRoute } from "next";
+import snapshot from "../public/data/miteco-special-fuels.json";
+import { PROVINCES } from "./provinces";
 import { SITE_URL } from "./site-config";
 
 const routes = [
@@ -10,7 +12,12 @@ const routes = [
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  return routes.map((route) => ({
+  const covered = new Set(snapshot.products.lpg.map((station) => station.province));
+  const provinceRoutes = PROVINCES
+    .filter((province) => covered.has(province.official))
+    .map((province) => ({ path: `/gasolineras-con-glp/${province.slug}`, priority: 0.8, frequency: "daily" as const }));
+
+  return [...routes, ...provinceRoutes].map((route) => ({
     url: `${SITE_URL}${route.path}`,
     lastModified: new Date("2026-08-10T00:00:00+02:00"),
     changeFrequency: route.frequency,

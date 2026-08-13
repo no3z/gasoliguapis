@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { displayProvince, PROVINCES } from "./provinces";
 import StationMap, { type VisibleMapBounds } from "./station-map";
 
 type FuelCode = "diesel_a" | "gasoline_95_e5" | "lpg" | "adblue";
@@ -79,21 +80,6 @@ type StaticSpecialFuels = {
   products: { lpg: StaticFuelStation[]; adblue: StaticFuelStation[] };
 };
 
-const provinces = [
-  ["CORUÑA (A)", "A Coruña"], ["ARABA/ÁLAVA", "Álava"], ["ALBACETE", "Albacete"], ["ALICANTE", "Alicante"],
-  ["ALMERÍA", "Almería"], ["ASTURIAS", "Asturias"], ["ÁVILA", "Ávila"], ["BADAJOZ", "Badajoz"],
-  ["BALEARS (ILLES)", "Illes Balears"], ["BARCELONA", "Barcelona"], ["BIZKAIA", "Bizkaia"], ["BURGOS", "Burgos"],
-  ["CÁCERES", "Cáceres"], ["CÁDIZ", "Cádiz"], ["CANTABRIA", "Cantabria"], ["CASTELLÓN / CASTELLÓ", "Castellón"],
-  ["CEUTA", "Ceuta"], ["CIUDAD REAL", "Ciudad Real"], ["CÓRDOBA", "Córdoba"], ["CUENCA", "Cuenca"],
-  ["GIPUZKOA", "Gipuzkoa"], ["GIRONA", "Girona"], ["GRANADA", "Granada"], ["GUADALAJARA", "Guadalajara"],
-  ["HUELVA", "Huelva"], ["HUESCA", "Huesca"], ["JAÉN", "Jaén"], ["LEÓN", "León"], ["LLEIDA", "Lleida"],
-  ["LUGO", "Lugo"], ["MADRID", "Madrid"], ["MÁLAGA", "Málaga"], ["MELILLA", "Melilla"], ["MURCIA", "Murcia"],
-  ["NAVARRA", "Navarra"], ["OURENSE", "Ourense"], ["PALENCIA", "Palencia"], ["PALMAS (LAS)", "Las Palmas"],
-  ["PONTEVEDRA", "Pontevedra"], ["RIOJA (LA)", "La Rioja"], ["SALAMANCA", "Salamanca"],
-  ["SANTA CRUZ DE TENERIFE", "Santa Cruz de Tenerife"], ["SEGOVIA", "Segovia"], ["SEVILLA", "Sevilla"],
-  ["SORIA", "Soria"], ["TARRAGONA", "Tarragona"], ["TERUEL", "Teruel"], ["TOLEDO", "Toledo"],
-  ["VALENCIA / VALÈNCIA", "Valencia"], ["VALLADOLID", "Valladolid"], ["ZAMORA", "Zamora"], ["ZARAGOZA", "Zaragoza"],
-] as const;
 const fuelOptions: { code: FuelCode; label: string; short: string }[] = [
   { code: "diesel_a", label: "Gasóleo A", short: "Diésel" },
   { code: "gasoline_95_e5", label: "Gasolina 95", short: "95" },
@@ -148,10 +134,6 @@ const confirmationCategories: Array<{ code: ConfirmationCategory; label: string 
   { code: "cleanliness", label: "Limpieza" },
 ];
 
-function displayProvince(value: string | null) {
-  return provinces.find(([officialValue]) => officialValue === value)?.[1] || value || "";
-}
-
 function distanceKm(latA: number, lngA: number, latB: number, lngB: number) {
   const radians = (value: number) => value * Math.PI / 180;
   const latDistance = radians(latB - latA);
@@ -176,13 +158,19 @@ function officialLocalTimestamp(value: string) {
 export default function StationExplorer({
   signInPath,
   initialFuel = "diesel_a",
+  initialProvince = "",
+  autoLocate = true,
+  pageHeading = "MAPA NACIONAL DE PARADAS · Encuentra tu mejor parada y las gasolineras cerca de ti",
 }: {
   signInPath: string;
   initialFuel?: FuelCode;
+  initialProvince?: string;
+  autoLocate?: boolean;
+  pageHeading?: string;
 }) {
   const [query, setQuery] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [province, setProvince] = useState("");
+  const [province, setProvince] = useState(initialProvince);
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [mapBounds, setMapBounds] = useState<VisibleMapBounds | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
@@ -521,7 +509,7 @@ export default function StationExplorer({
   const clearFilters = () => {
     setQuery("");
     setSearchTerm("");
-    setProvince("");
+    setProvince(initialProvince);
     setLocation(null);
     setMapBounds(null);
     setRadiusKm(75);
@@ -562,6 +550,10 @@ export default function StationExplorer({
   };
 
   useEffect(() => {
+    if (!autoLocate) {
+      window.setTimeout(() => setLocationLoading(false), 0);
+      return;
+    }
     if (!navigator.geolocation) {
       window.setTimeout(() => setLocationLoading(false), 0);
       return;
@@ -585,7 +577,7 @@ export default function StationExplorer({
       },
       { enableHighAccuracy: true, timeout: 10_000, maximumAge: 120_000 },
     );
-  }, []);
+  }, [autoLocate]);
 
   useEffect(() => {
     let active = true;
@@ -802,7 +794,7 @@ export default function StationExplorer({
       </header>
 
       <section className="map-stage advanced" aria-labelledby="map-heading">
-        <h1 className="sr-only" id="map-heading">MAPA NACIONAL DE PARADAS · Encuentra tu mejor parada y las gasolineras cerca de ti</h1>
+        <h1 className="sr-only" id="map-heading">{pageHeading}</h1>
         <div className="map-canvas-shell">
           <StationMap
             stations={filteredOfficialStations}
@@ -848,7 +840,7 @@ export default function StationExplorer({
                 aria-label="Selecciona toda España o una provincia"
               >
                 <option value="">Toda España</option>
-                {provinces.map(([value, label]) => <option value={value} key={value}>{label}</option>)}
+                {PROVINCES.map(({ official, name }) => <option value={official} key={official}>{name}</option>)}
               </select>
             </div>
             <ChevronDown size={18} />
@@ -1094,14 +1086,14 @@ export default function StationExplorer({
             {sessionUser.signedIn ? (
               <>
                 <h2>{sessionUser.displayName ? `Hola, ${sessionUser.displayName}` : "Sesión iniciada"}</h2>
-                <p>Tu sesión está lista. Ya puedes valorar estaciones oficiales; cada dimensión admite un voto por usuario.</p>
+                <p>Tu sesión está lista. Ya puedes puntuar estaciones oficiales; cada categoría admite un voto por usuario y no hay comentarios públicos.</p>
                 <button className="primary-action" onClick={() => setLoginOpen(false)}>Seguir explorando</button>
                 <small><ShieldCheck size={14} /> Tu correo nunca aparece públicamente.</small>
               </>
             ) : (
               <>
                 <h2>Haz mejores las paradas</h2>
-                <p>Inicia sesión para valorar y compartir cómo estaba esa parada.</p>
+                <p>Inicia sesión para puntuar la parada, los baños, el café o la limpieza. Sin comentarios públicos.</p>
                 <a className="social chatgpt" href={signInPath}><Sparkles size={18} /> Continuar con ChatGPT</a>
                 <div className="auth-coming"><span><b>G</b> Google</span><span><b>f</b> Facebook</span><small>Preparados para cuando confirmemos callbacks y credenciales.</small></div>
                 <small><ShieldCheck size={14} /> Nunca publicaremos nada sin tu permiso.</small>

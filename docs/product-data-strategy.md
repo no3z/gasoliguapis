@@ -48,7 +48,7 @@ La declaración de AdBlue es voluntaria: precio presente significa disponibilida
 - La visita verificada debe basarse en geolocalización puntual o navegación iniciada, sin guardar un historial continuo.
 - Las notas deben aplicar media bayesiana, frescura y confianza; dos votos no pueden superar automáticamente cientos de valoraciones.
 - Mostrar fecha, fuente y nivel de confianza de precios y servicios.
-- Moderación, denuncia, apelación, derecho de respuesta del negocio y auditoría son requisitos del MVP.
+- El MVP no acepta comentarios de texto ni reseñas libres: solo puntuaciones 1–5 y confirmaciones estructuradas. Esto reduce el riesgo de abuso, aunque los votos, cuentas y patrones anómalos siguen necesitando controles antifraude y auditoría.
 - Aceptar y rechazar cookies debe tener la misma facilidad; analítica y publicidad requieren consentimiento separado.
 - Los anuncios y promociones deben quedar rotulados y nunca alterar la nota ni ocultar reseñas.
 - La atribución MITECO propuesta: «Origen de los datos: Ministerio para la Transición Ecológica y el Reto Demográfico», con fecha de actualización.
@@ -58,7 +58,7 @@ La declaración de AdBlue es voluntaria: precio presente significa disponibilida
 
 Orden recomendado:
 
-1. Fichas Pro para estaciones (respuestas, verificación, analítica y promociones): 39–99 €/mes por ubicación como hipótesis a validar.
+1. Fichas Pro para estaciones (verificación, analítica y promociones): 39–99 €/mes por ubicación como hipótesis a validar. Pagar nunca cambia la nota ni el ranking orgánico.
 2. Panel multiestación, reputación y datos B2B para cadenas.
 3. Cupones y promociones de cafetería, menú, lavado o recarga.
 4. Patrocinios contextuales por corredor, identificados como publicidad.
