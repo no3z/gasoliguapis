@@ -291,6 +291,13 @@ button, select { cursor: pointer; }
 .seo-value a { display: grid; gap: 3px; padding: 14px; border: 1px solid rgba(255,255,255,.12); border-radius: 14px; color: #dbe7e3; background: rgba(255,255,255,.055); text-decoration: none; }
 .seo-value a strong { color: #fff; font-size: 12px; }
 .seo-value a span { font-size: 10px; line-height: 1.4; }
+.app-footer { display: grid; gap: 9px; padding: 25px 20px 105px; color: #c6d6d0; background: #102225; border-top: 1px solid rgba(255,255,255,.08); }
+.app-footer strong, .app-footer span { display: block; }
+.app-footer strong { color: #fff; font-size: 13px; }
+.app-footer span { margin-top: 3px; font-size: 9px; }
+.app-footer > a { width: max-content; color: #a8dec6; font-size: 10px; font-weight: 750; }
+.app-footer nav { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 5px; }
+.app-footer nav a { color: #c6d6d0; font-size: 9px; }
 
 .guide-shell { width: min(100%, 920px); min-height: 100vh; margin: 0 auto; color: var(--ink); background: var(--paper); box-shadow: 0 0 60px rgba(28,44,43,.12); }
 .guide-nav { display: flex; align-items: center; justify-content: space-between; padding: 17px 20px; border-bottom: 1px solid var(--line); }
@@ -374,7 +381,7 @@ button, select { cursor: pointer; }
 .calculator-disclaimer { margin: 10px 2px 0 !important; color: #9fb0ac !important; font-size: 9px !important; line-height: 1.4 !important; }
 .guide-footer { display: grid; gap: 20px; padding: 30px 20px; color: #dce7e3; background: var(--ink); }
 .guide-footer strong, .guide-footer span { display: block; }
-.guide-footer strong { color: white; }.guide-footer span { margin-top: 3px; font-size: 11px; }
+.guide-footer strong { color: white; }.guide-footer span { margin-top: 3px; font-size: 11px; }.guide-footer > div a { display: inline-block; margin-top: 9px; color: #a8dec6; font-size: 11px; }
 .guide-footer nav { display: grid; gap: 8px; }.guide-footer a { color: #bcd0c9; font-size: 11px; }
 .not-found { display: grid; place-items: center; align-content: center; min-height: 100vh; padding: 24px; text-align: center; background: var(--cream); }
 .not-found > span { color: var(--orange); font-size: 15px; font-weight: 900; letter-spacing: 2px; }
@@ -402,6 +409,7 @@ button, select { cursor: pointer; }
   .map-view { height: 470px; margin: 0 -42px; }.station-list.map-list { display: block; width: 440px; margin: -150px 0 30px auto; }.station-list.map-list .station-card:first-child { display: block; }
   .insight-card { width: 50%; margin-left: auto; }
   .seo-value { padding: 48px 42px 55px; }.seo-value > div { grid-template-columns: repeat(3, 1fr); }.seo-value h2 { font-size: 36px; }
+  .app-footer { grid-template-columns: 1fr auto; padding: 28px 42px; }.app-footer > a { justify-self: end; }.app-footer nav { grid-column: 1 / -1; }
   .guide-nav { padding: 20px 36px; }.guide-hero { padding: 75px 56px 65px; }.guide-content { padding: 15px 56px 75px; }
   .guide-grid, .method-steps { grid-template-columns: 1fr 1fr; }.calculator-fields { grid-template-columns: 1fr 1fr; }.calculator-field:first-child { grid-column: 1 / -1; }.province-link-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .local-seo { padding: 58px 56px 75px; }.local-stats { grid-template-columns: repeat(4, 1fr); }.local-station-list { grid-template-columns: 1fr 1fr; }

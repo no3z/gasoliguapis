@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { primaryNavigation } from "./site-config";
+import { CONTACT_EMAIL, legalNavigation, primaryNavigation } from "./site-config";
 
 export default function GuideShell({
   eyebrow,
@@ -32,9 +32,10 @@ export default function GuideShell({
       </article>
 
       <footer className="guide-footer">
-        <div><strong>Gasoliguapis</strong><span>Decide dónde merece la pena parar.</span></div>
+        <div><strong>Gasoliguapis</strong><span>Decide dónde merece la pena parar.</span><a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a></div>
         <nav aria-label="Guías útiles">
           {primaryNavigation.map((item) => <Link href={item.href} key={item.href}>{item.label}</Link>)}
+          {legalNavigation.map((item) => <Link href={item.href} key={item.href}>{item.label}</Link>)}
         </nav>
       </footer>
     </main>

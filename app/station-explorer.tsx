@@ -25,6 +25,7 @@ import {
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { displayProvince, PROVINCES } from "./provinces";
+import { CONTACT_EMAIL, legalNavigation } from "./site-config";
 import StationMap, { type VisibleMapBounds } from "./station-map";
 
 type FuelCode = "diesel_a" | "gasoline_95_e5" | "lpg" | "adblue";
@@ -1010,6 +1011,14 @@ export default function StationExplorer({
           <Link href="/gasolineras-con-adblue"><strong>AdBlue sin suposiciones</strong><span>Diferenciamos confirmado, comunidad y dato desconocido.</span></Link>
         </div>
       </section>
+
+      <footer className="app-footer">
+        <div><strong>Gasoliguapis</strong><span>Mapa y precios oficiales para decidir dónde parar.</span></div>
+        <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
+        <nav aria-label="Información legal">
+          {legalNavigation.map((item) => <Link href={item.href} key={item.href}>{item.label}</Link>)}
+        </nav>
+      </footer>
 
       <button className="contribute" onClick={contribute} aria-label="Confirmar datos de una estación"><ShieldCheck size={22} /> <span>Confirmar datos</span></button>
 

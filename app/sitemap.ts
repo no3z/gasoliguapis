@@ -9,6 +9,9 @@ const routes = [
   { path: "/gasolineras-con-adblue", priority: 0.9, frequency: "weekly" as const },
   { path: "/calculadora-ahorro-combustible", priority: 0.8, frequency: "monthly" as const },
   { path: "/metodologia", priority: 0.6, frequency: "monthly" as const },
+  { path: "/aviso-legal", priority: 0.2, frequency: "yearly" as const },
+  { path: "/privacidad", priority: 0.2, frequency: "yearly" as const },
+  { path: "/cookies", priority: 0.2, frequency: "yearly" as const },
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {

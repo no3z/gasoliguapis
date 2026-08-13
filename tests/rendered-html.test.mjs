@@ -81,6 +81,23 @@ test("renders useful province-level GLP pages and lists them in the sitemap", as
   assert.match(sitemapXml, /gasolineras-con-glp\/barcelona/);
 });
 
+test("publishes contact, privacy and cookie information before advertising", async () => {
+  const [homeResponse, privacyResponse, cookiesResponse] = await Promise.all([
+    render("/"),
+    render("/privacidad"),
+    render("/cookies"),
+  ]);
+  const [homeHtml, privacyHtml, cookiesHtml] = await Promise.all([
+    homeResponse.text(), privacyResponse.text(), cookiesResponse.text(),
+  ]);
+  assert.match(homeHtml, /contacto@gasoliguapis\.es/);
+  assert.match(homeHtml, /aviso-legal/);
+  assert.match(privacyHtml, /No guardamos un historial de trayectos/);
+  assert.match(privacyHtml, /Agencia Española de Protección de Datos/);
+  assert.match(cookiesHtml, /no tiene actualmente etiquetas publicitarias/i);
+  assert.match(cookiesHtml, /plataforma de consentimiento certificada/i);
+});
+
 test("keeps product metadata and removes the disposable starter", async () => {
   const [page, layout, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
