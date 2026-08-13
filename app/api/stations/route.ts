@@ -95,7 +95,7 @@ export async function GET(request: Request) {
   const orderClause = sort === "distance"
     ? "ORDER BY ABS(s.lat_e6 - ?) + ABS(s.lng_e6 - ?) ASC, p.price_micros ASC"
     : sort === "rating"
-      ? "ORDER BY (SELECT COALESCE(AVG(sr.value), 0) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'overall') DESC, (SELECT COUNT(*) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'overall') DESC, p.price_micros ASC"
+      ? "ORDER BY overallCount > 0 DESC, overallRankScore DESC, overallCount DESC, p.price_micros ASC"
       : "ORDER BY p.price_micros ASC, s.name ASC";
 
   let data: Array<Record<string, unknown>> = [];
@@ -128,6 +128,14 @@ export async function GET(request: Request) {
       adblue.price_micros AS adbluePriceMicros, COALESCE(ds.updated_at, adblue.observed_at) AS adblueObservedAt,
       (SELECT ROUND(AVG(sr.value), 1) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'overall') AS overallRating,
       (SELECT COUNT(*) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'overall') AS overallCount,
+      CASE
+        WHEN (SELECT COUNT(*) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'overall') = 0 THEN 0
+        ELSE ROUND(
+          ((SELECT COALESCE(SUM(sr.value), 0) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'overall') + 17.5)
+          / ((SELECT COUNT(*) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'overall') + 5),
+          3
+        )
+      END AS overallRankScore,
       (SELECT ROUND(AVG(sr.value), 1) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'bathroom') AS bathroomRating,
       (SELECT COUNT(*) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'bathroom') AS bathroomCount,
       (SELECT ROUND(AVG(sr.value), 1) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'coffee') AS coffeeRating,
@@ -245,6 +253,7 @@ export async function GET(request: Request) {
             adblueObservedAt: adbluePrice === null ? null : adblueObservedAt,
             overallRating: null,
             overallCount: 0,
+            overallRankScore: 0,
             bathroomRating: null,
             bathroomCount: 0,
             coffeeRating: null,

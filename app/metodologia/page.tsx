@@ -14,7 +14,7 @@ export default function MethodologyPage() {
       <section className="method-steps">
         <div><span>01</span><h2>Precios oficiales</h2><p>La fuente primaria es el servicio de precios de carburantes del Ministerio para la Transición Ecológica. Conservamos el identificador de la estación, el producto, el precio y el momento de observación.</p></div>
         <div><span>02</span><h2>Disponibilidad</h2><p>Un precio publicado confirma el producto en ese momento. En AdBlue, cuya comunicación puede ser voluntaria, la ausencia de precio se marca como “desconocido”, no como “no disponible”.</p></div>
-        <div><span>03</span><h2>Experiencia de parada</h2><p>Baños, café, limpieza, accesibilidad y servicios tendrán fecha, número de verificaciones y origen. Las puntuaciones demo nunca se mezclarán con votos reales.</p></div>
+        <div><span>03</span><h2>Experiencia de parada</h2><p>Mostramos la media real y su número de votos. Al ordenar por «Mejor puntuadas» aplicamos una media ponderada con una referencia inicial de 3,5 y cinco votos: así, una única valoración de cinco estrellas no domina el listado. Conforme llegan votos, el orden se aproxima a la media real.</p></div>
         <div><span>04</span><h2>Comunidad sin comentarios</h2><p>Las personas autenticadas pueden puntuar cada categoría una vez y cambiar su voto. No publicamos comentarios de texto; las confirmaciones rápidas caducan y los datos antiguos pierden confianza.</p></div>
       </section>
 

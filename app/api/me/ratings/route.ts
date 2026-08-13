@@ -19,12 +19,16 @@ export async function GET() {
 
   try {
     const database = (env as unknown as { DB: Database }).DB;
-    const rows = await database.prepare(`SELECT station_id AS stationId, value
+    const rows = await database.prepare(`SELECT station_id AS stationId, dimension_id AS dimension, value
       FROM station_ratings
-      WHERE user_id = ? AND dimension_id = 'overall'
+      WHERE user_id = ? AND dimension_id IN ('overall', 'bathroom', 'coffee', 'cleanliness')
       ORDER BY updated_at DESC
-      LIMIT 2000`).bind(`chatgpt:${user.userId}`).all<{ stationId: string; value: number }>();
-    const ratings = Object.fromEntries((rows.results || []).map((row) => [row.stationId, Number(row.value)]));
+      LIMIT 8000`).bind(`chatgpt:${user.userId}`).all<{ stationId: string; dimension: string; value: number }>();
+    const ratings = (rows.results || []).reduce<Record<string, Record<string, number>>>((result, row) => {
+      result[row.stationId] ||= {};
+      result[row.stationId][row.dimension] = Number(row.value);
+      return result;
+    }, {});
     return Response.json(
       { signedIn: true, displayName: user.displayName, ratings },
       { headers: { "cache-control": "private, no-store" } },

@@ -119,9 +119,20 @@ test("keeps product metadata and removes the disposable starter", async () => {
 });
 
 test("keeps ratings structured and does not expose a public comment flow", async () => {
-  const explorer = await readFile(new URL("../app/station-explorer.tsx", import.meta.url), "utf8");
+  const [explorer, stationsApi, personalRatingsApi, methodology] = await Promise.all([
+    readFile(new URL("../app/station-explorer.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/stations/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/me/ratings/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/metodologia/page.tsx", import.meta.url), "utf8"),
+  ]);
   assert.match(explorer, /Sin comentarios públicos/);
   assert.match(explorer, /cada categoría admite un voto por usuario/);
+  assert.match(explorer, /Confianza alta/);
+  assert.match(explorer, /La media visible es la real/);
+  assert.match(stationsApi, /overallRankScore/);
+  assert.match(stationsApi, /\+ 17\.5/);
+  assert.match(personalRatingsApi, /dimension_id IN \('overall', 'bathroom', 'coffee', 'cleanliness'\)/);
+  assert.match(methodology, /media ponderada/);
   assert.doesNotMatch(explorer, /textarea|submitComment|reviewBody/);
 });
 

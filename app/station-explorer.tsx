@@ -33,6 +33,7 @@ type ProductCode = "lpg" | "adblue";
 type SortMode = "price" | "distance" | "rating";
 type ActiveNav = "map" | "search" | "saved" | "profile";
 type RatingDimension = "overall" | "bathroom" | "coffee" | "cleanliness";
+type PersonalRatings = Record<string, Partial<Record<RatingDimension, number>>>;
 type ServiceFilter = "bathroom" | "coffee" | "restaurant" | "rated";
 type ConfirmationCategory = "lpg_status" | "adblue_status" | "bathroom" | "coffee" | "restaurant" | "cleanliness";
 type ConfirmationStatus = "working" | "no_product" | "broken" | "closed" | "clean" | "dirty" | "good" | "poor";
@@ -56,6 +57,7 @@ type OfficialStation = {
   distanceKm?: number | null;
   overallRating?: number | null;
   overallCount?: number;
+  overallRankScore?: number | null;
   bathroomRating?: number | null;
   bathroomCount?: number;
   coffeeRating?: number | null;
@@ -135,6 +137,17 @@ const confirmationCategories: Array<{ code: ConfirmationCategory; label: string 
   { code: "cleanliness", label: "Limpieza" },
 ];
 
+function ratingConfidence(count = 0) {
+  if (count >= 20) return "Confianza alta";
+  if (count >= 5) return "Confianza media";
+  if (count > 0) return "Pocos votos";
+  return "Sin votos";
+}
+
+function weightedRating(average?: number | null, count = 0) {
+  return average && count ? (average * count + 3.5 * 5) / (count + 5) : 0;
+}
+
 function distanceKm(latA: number, lngA: number, latB: number, lngB: number) {
   const radians = (value: number) => value * Math.PI / 180;
   const latDistance = radians(latB - latA);
@@ -187,7 +200,7 @@ export default function StationExplorer({
   const [filterOpen, setFilterOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [sessionUser, setSessionUser] = useState<{ signedIn: boolean; displayName: string | null }>({ signedIn: false, displayName: null });
-  const [personalRatings, setPersonalRatings] = useState<Record<string, number>>({});
+  const [personalRatings, setPersonalRatings] = useState<PersonalRatings>({});
   const [toast, setToast] = useState("");
   const [officialState, setOfficialState] = useState<{
     key: string;
@@ -221,6 +234,11 @@ export default function StationExplorer({
   );
   const officialError = officialLoading ? "" : officialState.error;
   const officialTotal = officialLoading ? 0 : officialState.total;
+  const personalOverallRatings = useMemo(() => Object.fromEntries(
+    Object.entries(personalRatings)
+      .filter(([, ratings]) => typeof ratings.overall === "number")
+      .map(([stationId, ratings]) => [stationId, ratings.overall as number]),
+  ), [personalRatings]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => setSearchTerm(query.trim()), 320);
@@ -337,7 +355,7 @@ export default function StationExplorer({
 
   const filteredOfficialStations = useMemo(() => officialStations
     .filter((station) => !favoritesOnly || favorites.includes(station.id))
-    .filter((station) => !mineOnly || Boolean(personalRatings[station.id])),
+    .filter((station) => !mineOnly || Boolean(personalRatings[station.id]?.overall)),
   [favorites, favoritesOnly, mineOnly, officialStations, personalRatings]);
   const orderedOfficialStations = useMemo(() => {
     if (!selectedStationId) return filteredOfficialStations;
@@ -372,7 +390,7 @@ export default function StationExplorer({
         .filter((value): value is number => typeof value === "number");
       const serviceScore = serviceRatings.length
         ? serviceRatings.reduce((sum, value) => sum + value, 0) / serviceRatings.length / 5
-        : .5;
+        : station.overallCount ? weightedRating(station.overallRating, station.overallCount) / 5 : .5;
       const priceScore = maxPrice === minPrice ? 1 : 1 - (station.priceMicros - minPrice) / (maxPrice - minPrice);
       const distanceScore = 1 - Math.min(Number(station.distanceKm ?? maxDistance), maxDistance) / maxDistance;
       return { id: station.id, score: distanceScore * .5 + priceScore * .35 + serviceScore * .15 };
@@ -584,7 +602,7 @@ export default function StationExplorer({
     let active = true;
     fetch("/api/me/ratings", { cache: "no-store" })
       .then(async (response) => response.ok
-        ? await response.json() as { signedIn?: boolean; displayName?: string | null; ratings?: Record<string, number> }
+        ? await response.json() as { signedIn?: boolean; displayName?: string | null; ratings?: PersonalRatings }
         : null)
       .then((payload) => {
         if (!active || !payload) return;
@@ -642,13 +660,19 @@ export default function StationExplorer({
       setOfficialState((current) => ({
         ...current,
         stations: current.stations.map((station) => station.id === stationId
-          ? { ...station, [ratingField]: payload.stats?.average, [countField]: payload.stats?.count }
+          ? {
+              ...station,
+              [ratingField]: payload.stats?.average,
+              [countField]: payload.stats?.count,
+              ...(ratingDimension === "overall" ? { overallRankScore: weightedRating(payload.stats?.average, payload.stats?.count) } : {}),
+            }
           : station),
       }));
     }
-    if (ratingDimension === "overall") {
-      setPersonalRatings((current) => ({ ...current, [stationId]: value }));
-    }
+    setPersonalRatings((current) => ({
+      ...current,
+      [stationId]: { ...current[stationId], [ratingDimension]: value },
+    }));
     setSessionUser((current) => ({ signedIn: true, displayName: current.displayName }));
     const dimensionLabel = ratingOptions.find((item) => item.code === ratingDimension)?.label.toLowerCase() || "parada";
     showToast(`Tu valoración de ${dimensionLabel}: ${value} estrellas`);
@@ -803,7 +827,7 @@ export default function StationExplorer({
             userLocation={location}
             loading={officialLoading}
             fuelLabel={selectedFuel.label}
-            personalRatings={personalRatings}
+            personalRatings={personalOverallRatings}
             radiusKm={radiusKm}
             lockViewport={Boolean(mapBounds)}
             onSelect={(stationId) => { setSelectedStationId(stationId); setActiveNav("map"); }}
@@ -917,6 +941,7 @@ export default function StationExplorer({
         </div>
 
         <p className="official-context"><ShieldCheck size={14} /> {favoritesOnly ? "Tus guardadas se conservan en este dispositivo y respetan los filtros actuales." : mineOnly ? "Mostramos únicamente las estaciones a las que ya has dado una nota general." : mapBounds ? "Estaciones dentro del rectángulo visible del mapa; mueve el mapa para buscar en otra zona." : location ? `Estaciones en un radio de ${radiusKm} km; la distancia es en línea recta.` : province ? `Resultados oficiales en ${provinceLabel}.` : "Búsqueda nacional en toda España."} Precio y disponibilidad procedentes de MITECO.</p>
+        {sort === "rating" && !selectedStationId ? <p className="rating-method-note"><Star size={14} /> Ordenamos por nota y cantidad de votos. La media visible es la real; el orden compensa las estaciones con muy pocos votos.</p> : null}
 
         {officialError ? <div className="official-message error"><X size={18} /> {officialError}</div> : null}
         {!officialLoading && !officialError && visibleOfficialStations.length === 0 ? (
@@ -952,9 +977,10 @@ export default function StationExplorer({
                 {stationHighlights(station).map((item) => <div className={item.className} key={item.label}><span>{item.label}</span><strong>{item.value}</strong><small>{item.detail}</small></div>)}
               </div>
               <div className="official-source"><Check size={13} /> MITECO · {formatOfficialTime(station.priceObservedAt)}</div>
-              <button className={`overall-score ${personalRatings[station.id] ? "user-rated" : ""}`} onClick={() => { setRatingStation(station.id); setRatingDimension("overall"); }}>
-                <span><Star size={15} fill="currentColor" /> {personalRatings[station.id] ? `Tu nota ${personalRatings[station.id]}/5` : station.overallCount ? Number(station.overallRating).toFixed(1) : "Sin nota"}</span>
-                <small>{personalRatings[station.id] ? `${station.overallCount ? `Media ${Number(station.overallRating).toFixed(1)} · ` : ""}Toca para cambiar tu valoración` : station.overallCount ? `${station.overallCount} valoraciones de la parada` : "Sé la primera persona en puntuarla"}</small>
+              <button className={`overall-score ${personalRatings[station.id]?.overall ? "user-rated" : ""}`} onClick={() => { setRatingStation(station.id); setRatingDimension("overall"); }}>
+                <span className="overall-public-rating"><Star size={15} fill="currentColor" /> {station.overallCount ? `${Number(station.overallRating).toFixed(1)}/5` : "Sin puntuación"}</span>
+                <span className="overall-rating-detail"><small>{station.overallCount ? `${station.overallCount} ${station.overallCount === 1 ? "voto" : "votos"}` : "Sé la primera persona"}</small><em>{ratingConfidence(station.overallCount)}</em></span>
+                {personalRatings[station.id]?.overall ? <strong>Tu nota {personalRatings[station.id]?.overall}/5</strong> : <strong>Puntuar</strong>}
               </button>
               {(fuel === "lpg" || fuel === "adblue") && recentConfirmation(station.fuelCommunityStatus, station.fuelCommunityAt) ? (
                 <div className={`fuel-confirmation ${station.fuelCommunityStatus === "working" ? "positive" : "warning"}`}>
@@ -981,7 +1007,7 @@ export default function StationExplorer({
                   <div className="rating-dimensions">{ratingOptions.map((option) => <button className={ratingDimension === option.code ? "active" : ""} key={option.code} onClick={() => setRatingDimension(option.code)}>{option.code === "bathroom" ? <Bath size={13} /> : option.code === "coffee" ? <Coffee size={13} /> : option.code === "cleanliness" ? <Sparkles size={13} /> : <Star size={13} />}{option.label}</button>)}</div>
                   <span>¿Qué nota le das a {ratingOptions.find((item) => item.code === ratingDimension)?.label.toLowerCase()}?</span>
                   <div className="rating-stars">{[1, 2, 3, 4, 5].map((value) => {
-                    const selected = ratingDimension === "overall" && value <= (personalRatings[station.id] || 0);
+                    const selected = value <= (personalRatings[station.id]?.[ratingDimension] || 0);
                     return <button className={selected ? "active" : ""} key={value} aria-label={`${value} estrellas para ${ratingDimension}`} onClick={() => rateStation(station.id, value)}><Star size={22} fill={selected ? "currentColor" : "none"} /></button>;
                   })}</div>
                 </div>
