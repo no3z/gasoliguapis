@@ -107,6 +107,7 @@ test("keeps product metadata and removes the disposable starter", async () => {
 
   assert.match(page, /StationExplorer/);
   assert.match(layout, /Gasoliguapis/);
+  assert.match(layout, /SITE_URL/);
   assert.match(layout, /og\.png/);
   assert.match(layout, /max-image-preview/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
@@ -116,6 +117,21 @@ test("keeps product metadata and removes the disposable starter", async () => {
   await access(new URL("../app/sitemap.ts", import.meta.url));
   await access(new URL("../app/manifest.ts", import.meta.url));
   await access(new URL(".openai/drizzle/0000_right_newton_destine.sql", templateRoot));
+});
+
+test("publishes crawlable SEO files on the custom domain", async () => {
+  const [robotsResponse, sitemapResponse] = await Promise.all([
+    render("/robots.txt"),
+    render("/sitemap.xml"),
+  ]);
+  assert.equal(robotsResponse.status, 200);
+  assert.equal(sitemapResponse.status, 200);
+  const [robots, sitemap] = await Promise.all([robotsResponse.text(), sitemapResponse.text()]);
+  assert.match(robots, /Allow: \//);
+  assert.match(robots, /Sitemap: https:\/\/gasoliguapis\.es\/sitemap\.xml/);
+  assert.match(sitemap, /<loc>https:\/\/gasoliguapis\.es<\/loc>/);
+  assert.doesNotMatch(robots, /no3s\.chatgpt\.site/);
+  assert.doesNotMatch(sitemap, /no3s\.chatgpt\.site/);
 });
 
 test("keeps ratings structured and does not expose a public comment flow", async () => {
