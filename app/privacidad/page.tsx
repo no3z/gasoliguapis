@@ -19,7 +19,7 @@ export default function PrivacyPage() {
       <section>
         <h2>Qué datos tratamos</h2>
         <ul>
-          <li>Si accedes con ChatGPT: identificador técnico de usuario, correo y nombre visible cuando esté disponible.</li>
+          <li>Si accedes con Google: identificador técnico de usuario, correo verificado y nombre visible cuando esté disponible.</li>
           <li>Las puntuaciones y confirmaciones que envías, junto con la estación, categoría y fecha correspondientes.</li>
           <li>Datos técnicos y registros mínimos necesarios para seguridad, prevención del fraude y funcionamiento del servicio.</li>
           <li>Los mensajes que envíes voluntariamente a la dirección de contacto.</li>
@@ -39,7 +39,7 @@ export default function PrivacyPage() {
 
       <section>
         <h2>Destinatarios y proveedores</h2>
-        <p>La web utiliza infraestructura de OpenAI Sites y Cloudflare para alojamiento, almacenamiento y seguridad. El mapa puede solicitar recursos técnicos a OpenFreeMap. Estos proveedores pueden recibir datos técnicos necesarios para entregar sus servicios. No vendemos datos personales ni publicamos el correo de las personas que puntúan.</p>
+        <p>La web utiliza Google únicamente para identificar a quienes deciden iniciar sesión, e infraestructura de OpenAI Sites y Cloudflare para alojamiento, almacenamiento y seguridad. El mapa puede solicitar recursos técnicos a OpenFreeMap. Estos proveedores pueden recibir datos técnicos necesarios para entregar sus servicios. No vendemos datos personales ni publicamos el correo de las personas que puntúan.</p>
       </section>
 
       <section>
@@ -47,7 +47,7 @@ export default function PrivacyPage() {
         <p>Las contribuciones se conservan mientras sean útiles para el servicio o hasta que solicites su supresión, salvo que debamos conservar temporalmente información mínima para atender obligaciones legales o prevenir fraude. Puedes solicitar acceso, rectificación, supresión, oposición, limitación o portabilidad escribiendo a {CONTACT_EMAIL}. También puedes reclamar ante la Agencia Española de Protección de Datos.</p>
       </section>
 
-      <aside className="source-note">Última actualización: 13 de agosto de 2026. Esta política se actualizará antes de activar cualquier plataforma publicitaria o analítica que utilice finalidades adicionales.</aside>
+      <aside className="source-note">Última actualización: 14 de agosto de 2026. Esta política se actualizará antes de activar cualquier plataforma publicitaria o analítica que utilice finalidades adicionales.</aside>
     </GuideShell>
   );
 }

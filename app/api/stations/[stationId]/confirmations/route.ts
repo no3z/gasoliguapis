@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { getChatGPTUser } from "../../../../chatgpt-auth";
+import { getAuthenticatedUser } from "../../../../google-auth";
 
 type Prepared = {
   bind: (...values: unknown[]) => Prepared;
@@ -48,9 +48,9 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ stationId: string }> },
 ) {
-  const user = await getChatGPTUser();
+  const user = await getAuthenticatedUser(request);
   if (!user) {
-    return Response.json({ error: "AUTH_REQUIRED", signInPath: "/signin-with-chatgpt?return_to=%2F" }, { status: 401 });
+    return Response.json({ error: "AUTH_REQUIRED", signInPath: "/api/auth/google/start?return_to=%2F" }, { status: 401 });
   }
   if (!request.headers.get("content-type")?.includes("application/json")) {
     return Response.json({ error: "Se esperaba JSON" }, { status: 415 });
@@ -127,7 +127,7 @@ export async function POST(
 
   const now = Date.now();
   const dayBucket = Math.floor(now / 86_400_000);
-  const localUserId = `chatgpt:${user.userId}`;
+  const localUserId = `google:${user.userId}`;
   await database.batch([
     database.prepare(`INSERT INTO users
       (id, display_name, role, status, trust_score, created_at, updated_at)
@@ -137,9 +137,9 @@ export async function POST(
       ),
     database.prepare(`INSERT INTO auth_identities
       (id, user_id, provider, provider_subject, email, created_at)
-      VALUES (?, ?, 'chatgpt', ?, ?, ?)
+      VALUES (?, ?, 'google', ?, ?, ?)
       ON CONFLICT(provider, provider_subject) DO UPDATE SET email=excluded.email`).bind(
-        `chatgpt:${user.userId}`, localUserId, user.userId, user.email, now,
+        `google:${user.userId}`, localUserId, user.userId, user.email, now,
       ),
   ]);
 

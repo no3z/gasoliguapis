@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { getChatGPTUser } from "../../../chatgpt-auth";
+import { getAuthenticatedUser } from "../../../google-auth";
 
 type Prepared = {
   bind: (...values: unknown[]) => Prepared;
@@ -8,8 +8,8 @@ type Prepared = {
 
 type Database = { prepare: (sql: string) => Prepared };
 
-export async function GET() {
-  const user = await getChatGPTUser();
+export async function GET(request: Request) {
+  const user = await getAuthenticatedUser(request);
   if (!user) {
     return Response.json(
       { signedIn: false, displayName: null, ratings: {} },
@@ -23,7 +23,7 @@ export async function GET() {
       FROM station_ratings
       WHERE user_id = ? AND dimension_id IN ('overall', 'bathroom', 'coffee', 'cleanliness')
       ORDER BY updated_at DESC
-      LIMIT 8000`).bind(`chatgpt:${user.userId}`).all<{ stationId: string; dimension: string; value: number }>();
+      LIMIT 8000`).bind(`google:${user.userId}`).all<{ stationId: string; dimension: string; value: number }>();
     const ratings = (rows.results || []).reduce<Record<string, Record<string, number>>>((result, row) => {
       result[row.stationId] ||= {};
       result[row.stationId][row.dimension] = Number(row.value);

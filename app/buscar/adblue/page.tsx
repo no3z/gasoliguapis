@@ -10,5 +10,5 @@ export const metadata: Metadata = {
 };
 
 export default function AdblueSearchPage() {
-  return <StationExplorer initialFuel="adblue" signInPath="/signin-with-chatgpt?return_to=%2Fbuscar%2Fadblue" />;
+  return <StationExplorer initialFuel="adblue" signInPath="/api/auth/google/start?return_to=%2Fbuscar%2Fadblue" />;
 }

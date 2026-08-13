@@ -96,7 +96,7 @@ export default async function GlpProvincePage({
   return (
     <>
       <StationExplorer
-        signInPath={`/signin-with-chatgpt?return_to=${encodeURIComponent(canonicalPath)}`}
+        signInPath={`/api/auth/google/start?return_to=${encodeURIComponent(canonicalPath)}`}
         initialFuel="lpg"
         initialProvince={province.official}
         autoLocate={false}

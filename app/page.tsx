@@ -29,7 +29,7 @@ export default function Home() {
         }) }}
       />
       <StationExplorer
-        signInPath="/signin-with-chatgpt?return_to=%2F"
+        signInPath="/api/auth/google/start?return_to=%2F"
       />
     </>
   );

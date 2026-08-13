@@ -641,6 +641,16 @@ export default function StationExplorer({
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("auth_error") !== "google") return;
+    setToast("No se pudo iniciar sesión con Google. Inténtalo de nuevo.");
+    url.searchParams.delete("auth_error");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    const timer = window.setTimeout(() => setToast(""), 3600);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   const openLogin = async () => {
     setLoginOpen(true);
     if (sessionUser.signedIn) return;
@@ -1153,14 +1163,17 @@ export default function StationExplorer({
                 <h2>{sessionUser.displayName ? `Hola, ${sessionUser.displayName}` : "Sesión iniciada"}</h2>
                 <p>Tu sesión está lista. Ya puedes puntuar estaciones oficiales; cada categoría admite un voto por usuario y no hay comentarios públicos.</p>
                 <button className="primary-action" onClick={() => setLoginOpen(false)}>Seguir explorando</button>
+                <button className="sign-out" onClick={() => {
+                  const returnTo = `${window.location.pathname}${window.location.search}`;
+                  window.location.assign(`/api/auth/logout?return_to=${encodeURIComponent(returnTo)}`);
+                }}>Cerrar sesión</button>
                 <small><ShieldCheck size={14} /> Tu correo nunca aparece públicamente.</small>
               </>
             ) : (
               <>
                 <h2>Haz mejores las paradas</h2>
                 <p>Inicia sesión para puntuar la parada, los baños, el café o la limpieza. Sin comentarios públicos.</p>
-                <a className="social chatgpt" href={signInPath}><Sparkles size={18} /> Continuar con ChatGPT</a>
-                <div className="auth-coming"><span><b>G</b> Google</span><span><b>f</b> Facebook</span><small>Preparados para cuando confirmemos callbacks y credenciales.</small></div>
+                <a className="social google" href={signInPath}><b aria-hidden="true">G</b> Continuar con Google</a>
                 <small><ShieldCheck size={14} /> Nunca publicaremos nada sin tu permiso.</small>
               </>
             )}

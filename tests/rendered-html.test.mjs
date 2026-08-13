@@ -99,9 +99,10 @@ test("publishes contact, privacy and cookie information before advertising", asy
 });
 
 test("keeps product metadata and removes the disposable starter", async () => {
-  const [page, layout, packageJson] = await Promise.all([
+  const [page, layout, stationExplorer, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/station-explorer.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
 
@@ -110,6 +111,8 @@ test("keeps product metadata and removes the disposable starter", async () => {
   assert.match(layout, /SITE_URL/);
   assert.match(layout, /og\.png/);
   assert.match(layout, /max-image-preview/);
+  assert.match(stationExplorer, /Continuar con Google/);
+  assert.doesNotMatch(stationExplorer, /Continuar con ChatGPT|Facebook/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview/SkeletonPreview.tsx", import.meta.url)));
   await access(new URL("../public/og.png", import.meta.url));

@@ -13,7 +13,7 @@ export default function CookiesPage() {
     <GuideShell eyebrow="COOKIES" title="Política de cookies" lead="Gasoliguapis utiliza actualmente solo el almacenamiento necesario para sus funciones básicas.">
       <section>
         <h2>Uso actual</h2>
-        <p>La web no tiene actualmente etiquetas publicitarias ni analítica publicitaria. El alojamiento y el acceso con ChatGPT pueden utilizar cookies técnicas imprescindibles para seguridad y sesión cuando decides iniciar sesión.</p>
+        <p>La web no tiene actualmente etiquetas publicitarias ni analítica publicitaria. Cuando decides acceder con Google, Gasoliguapis utiliza cookies técnicas imprescindibles y protegidas para completar el acceso y mantener tu sesión.</p>
       </section>
 
       <section>
@@ -36,7 +36,7 @@ export default function CookiesPage() {
         <p>Si tienes preguntas sobre estas tecnologías, escribe a <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.</p>
       </section>
 
-      <aside className="source-note">Última actualización: 13 de agosto de 2026.</aside>
+      <aside className="source-note">Última actualización: 14 de agosto de 2026.</aside>
     </GuideShell>
   );
 }
