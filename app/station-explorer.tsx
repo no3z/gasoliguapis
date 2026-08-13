@@ -29,7 +29,6 @@ import { CONTACT_EMAIL, legalNavigation } from "./site-config";
 import StationMap, { type VisibleMapBounds } from "./station-map";
 
 type FuelCode = "diesel_a" | "gasoline_95_e5" | "lpg" | "adblue";
-type ProductCode = "lpg" | "adblue";
 type SortMode = "price" | "distance" | "rating";
 type ActiveNav = "map" | "search" | "saved" | "profile";
 type RatingDimension = "overall" | "bathroom" | "coffee" | "cleanliness";
@@ -54,6 +53,8 @@ type OfficialStation = {
   lpgObservedAt: number | null;
   adbluePriceMicros: number | null;
   adblueObservedAt: number | null;
+  gasoline95PriceMicros?: number | null;
+  dieselPriceMicros?: number | null;
   distanceKm?: number | null;
   overallRating?: number | null;
   overallCount?: number;
@@ -84,11 +85,13 @@ type StaticSpecialFuels = {
 };
 
 const fuelOptions: { code: FuelCode; label: string; short: string }[] = [
-  { code: "diesel_a", label: "Gasóleo A", short: "Diésel" },
   { code: "gasoline_95_e5", label: "Gasolina 95", short: "95" },
+  { code: "diesel_a", label: "Gasóleo A", short: "Diésel" },
   { code: "lpg", label: "GLP", short: "GLP" },
   { code: "adblue", label: "AdBlue", short: "AdBlue" },
 ];
+const DEFAULT_FUEL: FuelCode = "gasoline_95_e5";
+const FUEL_STORAGE_KEY = "gasoliguapis:fuel";
 const radiusOptions = [10, 25, 50, 75, 100, 200] as const;
 const MAP_STATION_LIMIT = 8;
 const ratingOptions: { code: RatingDimension; label: string }[] = [
@@ -172,7 +175,7 @@ function officialLocalTimestamp(value: string) {
 
 export default function StationExplorer({
   signInPath,
-  initialFuel = "diesel_a",
+  initialFuel = DEFAULT_FUEL,
   initialProvince = "",
   autoLocate = true,
   pageHeading = "MAPA NACIONAL DE PARADAS · Encuentra tu mejor parada y las gasolineras cerca de ti",
@@ -192,7 +195,6 @@ export default function StationExplorer({
   const [radiusKm, setRadiusKm] = useState(75);
   const [sort, setSort] = useState<SortMode>("price");
   const [fuel, setFuel] = useState<FuelCode>(initialFuel);
-  const [requiredProducts, setRequiredProducts] = useState<ProductCode[]>([]);
   const [serviceFilters, setServiceFilters] = useState<ServiceFilter[]>([]);
   const [favorites, setFavorites] = useState<Array<number | string>>([]);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
@@ -221,13 +223,12 @@ export default function StationExplorer({
 
   const selectedFuel = fuelOptions.find((item) => item.code === fuel) ?? fuelOptions[0];
   const provinceLabel = displayProvince(province);
-  const requiredProductsKey = [...requiredProducts].sort().join(",");
   const serviceFiltersKey = [...serviceFilters].sort().join(",");
   const locationKey = location ? `${location.latitude.toFixed(4)},${location.longitude.toFixed(4)}` : "national";
   const mapBoundsKey = mapBounds
     ? `${mapBounds.west.toFixed(4)},${mapBounds.south.toFixed(4)},${mapBounds.east.toFixed(4)},${mapBounds.north.toFixed(4)}`
     : "no-bounds";
-  const officialRequestKey = `${fuel}|${province}|${requiredProductsKey}|${serviceFiltersKey}|${searchTerm}|${locationKey}|${mapBoundsKey}|${radiusKm}|${sort}`;
+  const officialRequestKey = `${fuel}|${province}|${serviceFiltersKey}|${searchTerm}|${locationKey}|${mapBoundsKey}|${radiusKm}|${sort}`;
   const officialLoading = (locationLoading && !location) || officialState.key !== officialRequestKey;
   const officialStations = useMemo(
     () => officialLoading ? [] : officialState.stations,
@@ -256,6 +257,16 @@ export default function StationExplorer({
   }, []);
 
   useEffect(() => {
+    if (initialFuel !== DEFAULT_FUEL) return;
+    try {
+      const savedFuel = window.localStorage.getItem(FUEL_STORAGE_KEY) as FuelCode | null;
+      if (savedFuel && fuelOptions.some((option) => option.code === savedFuel)) setFuel(savedFuel);
+    } catch {
+      // The default remains available when local storage is unavailable.
+    }
+  }, [initialFuel]);
+
+  useEffect(() => {
     if (locationLoading && !location) return;
     const controller = new AbortController();
     const params = new URLSearchParams({ fuel, limit: "100", sort });
@@ -267,7 +278,6 @@ export default function StationExplorer({
       params.set("radiusKm", String(radiusKm));
     }
     if (mapBounds) params.set("bounds", mapBoundsKey);
-    requiredProductsKey.split(",").filter(Boolean).forEach((product) => params.append("requires", product));
     serviceFiltersKey.split(",").filter(Boolean).forEach((service) => params.append("service", service));
     fetch(`/api/stations?${params.toString()}`, { signal: controller.signal })
       .then(async (response) => {
@@ -297,8 +307,6 @@ export default function StationExplorer({
               .filter((station) => !province || station.province?.toLocaleLowerCase("es") === province.toLocaleLowerCase("es"))
               .filter((station) => !normalizedQuery || [station.name, station.brand, station.address, station.municipality, station.province]
                 .filter(Boolean).join(" ").toLocaleLowerCase("es").includes(normalizedQuery))
-              .filter((station) => !requiredProductsKey.split(",").includes("lpg") || lpgById.has(station.id))
-              .filter((station) => !requiredProductsKey.split(",").includes("adblue") || adblueById.has(station.id))
               .filter((station) => !mapBounds || (
                 station.lngE6 / 1_000_000 >= mapBounds.west
                 && station.lngE6 / 1_000_000 <= mapBounds.east
@@ -352,7 +360,7 @@ export default function StationExplorer({
         });
       });
     return () => controller.abort();
-  }, [fuel, location, locationLoading, mapBounds, mapBoundsKey, officialRequestKey, province, radiusKm, requiredProductsKey, searchTerm, serviceFiltersKey, sort]);
+  }, [fuel, location, locationLoading, mapBounds, mapBoundsKey, officialRequestKey, province, radiusKm, searchTerm, serviceFiltersKey, sort]);
 
   const filteredOfficialStations = useMemo(() => officialStations
     .filter((station) => !favoritesOnly || favorites.includes(station.id))
@@ -528,13 +536,6 @@ export default function StationExplorer({
     window.setTimeout(() => setToast(""), 2600);
   };
 
-  const toggleRequiredProduct = (product: ProductCode) => {
-    setRequiredProducts((current) => current.includes(product)
-      ? current.filter((item) => item !== product)
-      : [...current, product]);
-    setShowCount(20);
-  };
-
   const toggleServiceFilter = (service: ServiceFilter) => {
     setServiceFilters((current) => current.includes(service)
       ? current.filter((item) => item !== service)
@@ -544,9 +545,11 @@ export default function StationExplorer({
 
   const selectFuel = (nextFuel: FuelCode) => {
     const activeSpecialFuel = fuel === nextFuel && (nextFuel === "lpg" || nextFuel === "adblue");
-    const resolvedFuel: FuelCode = activeSpecialFuel ? "diesel_a" : nextFuel;
+    const resolvedFuel: FuelCode = activeSpecialFuel ? DEFAULT_FUEL : nextFuel;
     setFuel(resolvedFuel);
-    setRequiredProducts((current) => current.filter((product) => product !== nextFuel && product !== resolvedFuel));
+    try { window.localStorage.setItem(FUEL_STORAGE_KEY, resolvedFuel); } catch {
+      // The choice still applies for the current visit.
+    }
     setSelectedStationId(null);
     setFavoritesOnly(false);
     setMineOnly(false);
@@ -561,9 +564,11 @@ export default function StationExplorer({
     setMapBounds(null);
     setRadiusKm(75);
     setSort("price");
-    setRequiredProducts([]);
     setServiceFilters([]);
     setFuel(initialFuel);
+    try { window.localStorage.setItem(FUEL_STORAGE_KEY, initialFuel); } catch {
+      // The reset still applies for the current visit.
+    }
     setFavoritesOnly(false);
     setMineOnly(false);
     setShowCount(20);
@@ -809,33 +814,20 @@ export default function StationExplorer({
   };
 
   const stationHighlights = (station: OfficialStation) => {
-    const highlights = [{
-      label: selectedFuel.label,
-      value: formatPrice(station.priceMicros),
-      detail: "por litro",
-      className: "primary",
-    }];
-    if (fuel !== "lpg") highlights.push({
-      label: "GLP",
-      value: formatPrice(station.lpgPriceMicros),
-      detail: station.lpgPriceMicros !== null ? "confirmado" : "sin dato",
-      className: station.lpgPriceMicros !== null ? "available" : "unknown",
-    });
-    if (fuel !== "adblue") highlights.push({
-      label: "AdBlue",
-      value: formatPrice(station.adbluePriceMicros),
-      detail: station.adbluePriceMicros !== null ? "confirmado" : "desconocido",
-      className: station.adbluePriceMicros !== null ? "available" : "unknown",
-    });
-    if (highlights.length < 3) highlights.push({
-      label: location ? "Distancia" : "Provincia",
-      value: location && station.distanceKm !== null && station.distanceKm !== undefined
-        ? `${station.distanceKm < 10 ? station.distanceKm.toFixed(1) : Math.round(station.distanceKm)} km`
-        : displayProvince(station.province) || "España",
-      detail: location ? "en línea recta" : "ámbito oficial",
-      className: "info",
-    });
-    return highlights.slice(0, 3);
+    const knownPrices: Array<{ code: FuelCode; label: string; price: number | null | undefined }> = [
+      { code: "gasoline_95_e5", label: "Gasolina 95", price: fuel === "gasoline_95_e5" ? station.priceMicros : station.gasoline95PriceMicros },
+      { code: "diesel_a", label: "Diésel", price: fuel === "diesel_a" ? station.priceMicros : station.dieselPriceMicros },
+      { code: "lpg", label: "GLP", price: fuel === "lpg" ? station.priceMicros : station.lpgPriceMicros },
+      { code: "adblue", label: "AdBlue", price: fuel === "adblue" ? station.priceMicros : station.adbluePriceMicros },
+    ];
+    return knownPrices
+      .filter((item): item is typeof item & { price: number } => typeof item.price === "number")
+      .map((item) => ({
+        label: item.label,
+        value: formatPrice(item.price),
+        detail: "precio oficial",
+        className: item.code === fuel ? "primary" : "available",
+      }));
   };
 
   return (
@@ -865,6 +857,7 @@ export default function StationExplorer({
             userLocation={location}
             loading={officialLoading}
             fuelLabel={selectedFuel.label}
+            fuelCode={fuel}
             personalRatings={personalOverallRatings}
             radiusKm={radiusKm}
             lockViewport={Boolean(mapBounds)}
@@ -935,7 +928,7 @@ export default function StationExplorer({
                   key={option.code}
                   className={fuel === option.code ? "active" : ""}
                   aria-pressed={fuel === option.code}
-                  aria-label={fuel === option.code && (option.code === "lpg" || option.code === "adblue") ? `Desactivar ${option.short} y volver a Diésel` : `Buscar ${option.label}`}
+                  aria-label={fuel === option.code && (option.code === "lpg" || option.code === "adblue") ? `Desactivar ${option.short} y volver a Gasolina 95` : `Buscar ${option.label}`}
                   onClick={() => selectFuel(option.code)}
                 >
                   {option.code === "adblue" ? <Droplets size={15} /> : <Fuel size={15} />}{option.short}
@@ -952,16 +945,6 @@ export default function StationExplorer({
           ) : null}
 
           <div className="quick-filters" aria-label="Filtros rápidos">
-            {fuel !== "lpg" ? <button
-              className={requiredProducts.includes("lpg") ? "active" : ""}
-              aria-pressed={requiredProducts.includes("lpg")}
-              onClick={() => toggleRequiredProduct("lpg")}
-            ><Fuel size={16} /> Tiene GLP</button> : null}
-          {fuel !== "adblue" ? <button
-              className={requiredProducts.includes("adblue") ? "active" : ""}
-              aria-pressed={requiredProducts.includes("adblue")}
-              onClick={() => toggleRequiredProduct("adblue")}
-            ><Droplets size={16} /> Tiene AdBlue</button> : null}
           <button className={serviceFilters.includes("bathroom") ? "active" : ""} aria-pressed={serviceFilters.includes("bathroom")} onClick={() => toggleServiceFilter("bathroom")}><Bath size={16} /> Baños</button>
           <button className={serviceFilters.includes("coffee") ? "active" : ""} aria-pressed={serviceFilters.includes("coffee")} onClick={() => toggleServiceFilter("coffee")}><Coffee size={16} /> Cafetería</button>
           <button className={serviceFilters.includes("restaurant") ? "active" : ""} aria-pressed={serviceFilters.includes("restaurant")} onClick={() => toggleServiceFilter("restaurant")}><UtensilsCrossed size={16} /> Restaurante</button>
@@ -985,7 +968,7 @@ export default function StationExplorer({
 
         {officialError ? <div className="official-message error"><X size={18} /> {officialError}</div> : null}
         {!officialLoading && !officialError && visibleOfficialStations.length === 0 ? (
-          <div className="official-message"><Fuel size={19} /><div><strong>{favoritesOnly ? "No tienes paradas guardadas en estos resultados" : mineOnly ? "Aún no has puntuado estaciones con estos filtros" : "Aún no aparecen estaciones con estos criterios"}</strong><span>{favoritesOnly ? "Vuelve a explorar y toca el corazón de una estación para guardarla." : mineOnly ? "Puntúa una parada y aparecerá aquí automáticamente." : "Prueba otra búsqueda, quita GLP o AdBlue, o amplía el radio."}</span><button onClick={favoritesOnly || mineOnly ? showSearch : clearFilters}>{favoritesOnly || mineOnly ? "Volver a buscar" : "Limpiar filtros"}</button></div></div>
+          <div className="official-message"><Fuel size={19} /><div><strong>{favoritesOnly ? "No tienes paradas guardadas en estos resultados" : mineOnly ? "Aún no has puntuado estaciones con estos filtros" : "Aún no aparecen estaciones con estos criterios"}</strong><span>{favoritesOnly ? "Vuelve a explorar y toca el corazón de una estación para guardarla." : mineOnly ? "Puntúa una parada y aparecerá aquí automáticamente." : "Prueba otra búsqueda, elige otro combustible o amplía el radio."}</span><button onClick={favoritesOnly || mineOnly ? showSearch : clearFilters}>{favoritesOnly || mineOnly ? "Volver a buscar" : "Limpiar filtros"}</button></div></div>
         ) : null}
         {officialLoading ? <div className="official-loading"><span /><span /><span /></div> : null}
 
@@ -1138,8 +1121,6 @@ export default function StationExplorer({
             <div className="sheet-grabber" /><div className="modal-title"><h2>Tu parada ideal</h2><button onClick={() => setFilterOpen(false)}><X /></button></div>
             <p>Elige lo que no puede faltar en esta parada.</p>
             <div className="filter-options">
-              <button className={requiredProducts.includes("lpg") ? "selected" : ""} aria-pressed={requiredProducts.includes("lpg")} onClick={() => toggleRequiredProduct("lpg")}><span>Debe tener GLP</span><Check size={16} /></button>
-              <button className={requiredProducts.includes("adblue") ? "selected" : ""} aria-pressed={requiredProducts.includes("adblue")} onClick={() => toggleRequiredProduct("adblue")}><span>Debe tener AdBlue</span><Check size={16} /></button>
               {[
                 { code: "bathroom" as const, label: "Baños confirmados" },
                 { code: "coffee" as const, label: "Cafetería confirmada" },

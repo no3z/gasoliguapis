@@ -51,7 +51,7 @@ export async function GET(request: Request) {
   const database = (env as unknown as { DB: Database }).DB;
   const url = new URL(request.url);
   const province = url.searchParams.get("province")?.trim();
-  const fuel = url.searchParams.get("fuel")?.trim() || "diesel_a";
+  const fuel = url.searchParams.get("fuel")?.trim() || "gasoline_95_e5";
   const query = url.searchParams.get("q")?.trim().slice(0, 80) || "";
   const sortParam = url.searchParams.get("sort");
   const requestedSort = sortParam === "distance" ? "distance" : sortParam === "rating" ? "rating" : "price";
@@ -72,15 +72,12 @@ export async function GET(request: Request) {
   const requestedRadius = Number(url.searchParams.get("radiusKm") || 75);
   const radiusKm = Number.isFinite(requestedRadius) ? Math.min(250, Math.max(5, requestedRadius)) : 75;
   const sort = requestedSort === "distance" && !hasLocation ? "price" : requestedSort;
-  const required = url.searchParams.getAll("requires").filter((item) => item === "lpg" || item === "adblue");
   const services = url.searchParams.getAll("service").filter((item) => item === "bathroom" || item === "coffee" || item === "restaurant" || item === "rated");
   const requestedLimit = Number(url.searchParams.get("limit") || 30);
   const limit = Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, Math.floor(requestedLimit))) : 30;
   if (!ALLOWED_FUELS.has(fuel)) {
     return Response.json({ error: "Combustible no válido" }, { status: 400 });
   }
-  const requiresLpg = required.includes("lpg") ? 1 : 0;
-  const requiresAdblue = required.includes("adblue") ? 1 : 0;
   const requiresBathroom = services.includes("bathroom") ? 1 : 0;
   const requiresCoffee = services.includes("coffee") ? 1 : 0;
   const requiresRestaurant = services.includes("restaurant") ? 1 : 0;
@@ -103,7 +100,7 @@ export async function GET(request: Request) {
   let databaseInitialized = false;
   try {
     const values: unknown[] = [
-      fuel, province || null, province || null, queryLike, queryLike, requiresLpg, requiresAdblue,
+      fuel, province || null, province || null, queryLike, queryLike,
       requiresBathroom, requiresCoffee, requiresRestaurant, requiresRating,
     ];
     if (hasMapBounds && mapBounds) values.push(
@@ -124,6 +121,8 @@ export async function GET(request: Request) {
       s.id, s.name, s.brand, s.address, s.municipality, s.province,
       s.lat_e6 AS latE6, s.lng_e6 AS lngE6,
       p.price_micros AS priceMicros, p.currency, COALESCE(ds.updated_at, p.observed_at) AS priceObservedAt,
+      gasoline95.price_micros AS gasoline95PriceMicros,
+      diesel.price_micros AS dieselPriceMicros,
       lpg.price_micros AS lpgPriceMicros, COALESCE(ds.updated_at, lpg.observed_at) AS lpgObservedAt,
       adblue.price_micros AS adbluePriceMicros, COALESCE(ds.updated_at, adblue.observed_at) AS adblueObservedAt,
       (SELECT ROUND(AVG(sr.value), 1) FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'overall') AS overallRating,
@@ -152,6 +151,10 @@ export async function GET(request: Request) {
     FROM stations s
     INNER JOIN station_current_prices p
       ON p.station_id = s.id AND p.fuel_type_id = ?
+    LEFT JOIN station_current_prices gasoline95
+      ON gasoline95.station_id = s.id AND gasoline95.fuel_type_id = 'gasoline_95_e5'
+    LEFT JOIN station_current_prices diesel
+      ON diesel.station_id = s.id AND diesel.fuel_type_id = 'diesel_a'
     LEFT JOIN station_current_prices lpg
       ON lpg.station_id = s.id AND lpg.fuel_type_id = 'lpg'
     LEFT JOIN station_current_prices adblue
@@ -167,8 +170,6 @@ export async function GET(request: Request) {
       AND s.lng_e6 BETWEEN -19000000 AND 5000000
       AND (? IS NULL OR lower(s.province) = lower(?))
       AND (? IS NULL OR lower(coalesce(s.name, '') || ' ' || coalesce(s.brand, '') || ' ' || coalesce(s.address, '') || ' ' || coalesce(s.municipality, '') || ' ' || coalesce(s.province, '')) LIKE ?)
-      AND (? = 0 OR lpg.station_id IS NOT NULL)
-      AND (? = 0 OR adblue.station_id IS NOT NULL)
       AND (? = 0 OR bathroom_check.latest_status = 'clean' OR EXISTS (SELECT 1 FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'bathroom'))
       AND (? = 0 OR coffee_check.latest_status = 'good' OR EXISTS (SELECT 1 FROM station_ratings sr WHERE sr.station_id = s.id AND sr.dimension_id = 'coffee'))
       AND (? = 0 OR restaurant_check.latest_status = 'good')
@@ -198,7 +199,7 @@ export async function GET(request: Request) {
   if (data.length === 0 && !databaseInitialized) {
     try {
       type ProductPayload = { Fecha?: string; ListaEESSPrecio?: Array<Record<string, string>> };
-      const productIds = [...new Set([PRODUCT_IDS[fuel], PRODUCT_IDS.lpg, PRODUCT_IDS.adblue])];
+      const productIds = [...new Set([PRODUCT_IDS.gasoline_95_e5, PRODUCT_IDS.diesel_a, PRODUCT_IDS.lpg, PRODUCT_IDS.adblue])];
       const payloadEntries = await Promise.all(productIds.map(async (productId) => {
         const response = await fetch(`${MITECO_PRODUCT_ENDPOINT}/${productId}`, {
           headers: { accept: "application/json" },
@@ -209,19 +210,21 @@ export async function GET(request: Request) {
       }));
       const payloads = Object.fromEntries(payloadEntries) as Record<string, ProductPayload>;
       const selectedPayload = payloads[PRODUCT_IDS[fuel]];
+      const gasoline95Payload = payloads[PRODUCT_IDS.gasoline_95_e5];
+      const dieselPayload = payloads[PRODUCT_IDS.diesel_a];
       const lpgPayload = payloads[PRODUCT_IDS.lpg];
       const adbluePayload = payloads[PRODUCT_IDS.adblue];
       const observedAt = officialTimestamp(selectedPayload.Fecha);
       const lpgObservedAt = officialTimestamp(lpgPayload.Fecha);
       const adblueObservedAt = officialTimestamp(adbluePayload.Fecha);
+      const gasoline95ByStation = new Map((gasoline95Payload.ListaEESSPrecio || []).map((station) => [station.IDEESS, decimal(station.PrecioProducto)]));
+      const dieselByStation = new Map((dieselPayload.ListaEESSPrecio || []).map((station) => [station.IDEESS, decimal(station.PrecioProducto)]));
       const lpgByStation = new Map((lpgPayload.ListaEESSPrecio || []).map((station) => [station.IDEESS, decimal(station.PrecioProducto)]));
       const adblueByStation = new Map((adbluePayload.ListaEESSPrecio || []).map((station) => [station.IDEESS, decimal(station.PrecioProducto)]));
       const matches = (selectedPayload.ListaEESSPrecio || [])
         .filter((station) => !province || station.Provincia?.toLocaleLowerCase("es") === province.toLocaleLowerCase("es"))
         .filter((station) => !query || [station.Rótulo, station.Dirección, station.Municipio, station.Provincia]
           .filter(Boolean).join(" ").toLocaleLowerCase("es").includes(query.toLocaleLowerCase("es")))
-        .filter((station) => !requiresLpg || lpgByStation.has(station.IDEESS))
-        .filter((station) => !requiresAdblue || adblueByStation.has(station.IDEESS))
         .filter((station) => {
           if (!hasMapBounds || !mapBounds) return true;
           const lat = Number((station.Latitud || "0").replace(",", "."));
@@ -231,6 +234,8 @@ export async function GET(request: Request) {
         .filter(() => services.length === 0)
         .map((station) => {
           const selectedPrice = decimal(station.PrecioProducto) as number;
+          const gasoline95Price = gasoline95ByStation.get(station.IDEESS) ?? null;
+          const dieselPrice = dieselByStation.get(station.IDEESS) ?? null;
           const lpgPrice = lpgByStation.get(station.IDEESS) ?? null;
           const adbluePrice = adblueByStation.get(station.IDEESS) ?? null;
           const lat = Number((station.Latitud || "0").replace(",", "."));
@@ -247,6 +252,8 @@ export async function GET(request: Request) {
             priceMicros: Math.round(selectedPrice * 1_000_000),
             currency: "EUR",
             priceObservedAt: observedAt,
+            gasoline95PriceMicros: gasoline95Price === null ? null : Math.round(gasoline95Price * 1_000_000),
+            dieselPriceMicros: dieselPrice === null ? null : Math.round(dieselPrice * 1_000_000),
             lpgPriceMicros: lpgPrice === null ? null : Math.round(lpgPrice * 1_000_000),
             lpgObservedAt: lpgPrice === null ? null : lpgObservedAt,
             adbluePriceMicros: adbluePrice === null ? null : Math.round(adbluePrice * 1_000_000),

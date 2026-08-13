@@ -11,6 +11,8 @@ export type MapStation = {
   latE6: number;
   lngE6: number;
   priceMicros: number;
+  gasoline95PriceMicros?: number | null;
+  dieselPriceMicros?: number | null;
   lpgPriceMicros?: number | null;
   adbluePriceMicros?: number | null;
   overallRating?: number | null;
@@ -40,6 +42,7 @@ type Props = {
   userLocation: { latitude: number; longitude: number } | null;
   loading: boolean;
   fuelLabel: string;
+  fuelCode: "diesel_a" | "gasoline_95_e5" | "lpg" | "adblue";
   personalRatings: Record<string, number>;
   radiusKm: number;
   lockViewport: boolean;
@@ -88,7 +91,7 @@ function fitVisibleStations(
   });
 }
 
-export default function StationMap({ stations, selectedId, userLocation, loading, fuelLabel, personalRatings, radiusKm, lockViewport, refitKey, onSelect, onOpenList, onDirections, onRequestLocation, onSearchVisibleArea }: Props) {
+export default function StationMap({ stations, selectedId, userLocation, loading, fuelLabel, fuelCode, personalRatings, radiusKm, lockViewport, refitKey, onSelect, onOpenList, onDirections, onRequestLocation, onSearchVisibleArea }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markersRef = useRef<MapLibreMarker[]>([]);
@@ -268,6 +271,13 @@ export default function StationMap({ stations, selectedId, userLocation, loading
     return count ? `★ ${Number(rating).toFixed(1)}` : "Sin dato";
   };
 
+  const selectedPrices = selectedStation ? [
+    { code: "gasoline_95_e5", label: "Gasolina 95", value: fuelCode === "gasoline_95_e5" ? selectedStation.priceMicros : selectedStation.gasoline95PriceMicros },
+    { code: "diesel_a", label: "Diésel", value: fuelCode === "diesel_a" ? selectedStation.priceMicros : selectedStation.dieselPriceMicros },
+    { code: "lpg", label: "GLP", value: fuelCode === "lpg" ? selectedStation.priceMicros : selectedStation.lpgPriceMicros },
+    { code: "adblue", label: "AdBlue", value: fuelCode === "adblue" ? selectedStation.priceMicros : selectedStation.adbluePriceMicros },
+  ].filter((item): item is typeof item & { value: number } => typeof item.value === "number") : [];
+
   return (
     <section className="map-explorer" id="mapa" aria-label="Mapa de gasolineras filtradas">
       <div ref={containerRef} className="stations-map" />
@@ -296,8 +306,7 @@ export default function StationMap({ stations, selectedId, userLocation, loading
             <button onClick={() => onOpenList(selectedStation.id)}><Star size={15} /> Ficha</button>
           </div>
           <div className="map-selection-qualities">
-            <span><b>GLP</b>{selectedStation.lpgPriceMicros ? formatPrice(selectedStation.lpgPriceMicros) : "Sin dato"}</span>
-            <span><b>AdBlue</b>{selectedStation.adbluePriceMicros ? formatPrice(selectedStation.adbluePriceMicros) : "Sin dato"}</span>
+            {selectedPrices.map((price) => <span key={price.code}><b>{price.label}</b>{formatPrice(price.value)}</span>)}
             <span><b>Baños</b>{serviceValue(selectedStation.bathroomStatus, selectedStation.bathroomRating, selectedStation.bathroomCount)}</span>
             <span><b>Café</b>{serviceValue(selectedStation.coffeeStatus, selectedStation.coffeeRating, selectedStation.coffeeCount)}</span>
             <span><b>Restaurante</b>{serviceValue(selectedStation.restaurantStatus)}</span>

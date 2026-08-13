@@ -27,8 +27,8 @@ test("server-renders the Gasoliguapis product", async () => {
   assert.match(html, /CATÁLOGO OFICIAL · MITECO/);
   assert.match(html, /Combustible, servicios y puntuaciones/);
   assert.match(html, /Tu combustible/);
-  assert.match(html, /Tiene GLP/);
-  assert.match(html, /Tiene AdBlue/);
+  assert.match(html, /aria-pressed="true"[^>]*>[^<]*(?:<[^>]+>)*95/i);
+  assert.doesNotMatch(html, /Tiene GLP|Tiene AdBlue|Debe tener GLP|Debe tener AdBlue/);
   assert.match(html, /Toda España/);
   assert.match(html, /Cerca de mí/);
   assert.match(html, /Más baratas/);
@@ -215,9 +215,10 @@ test("connects the filtered station list to an interactive map", async () => {
   assert.match(explorer, /personalRatings/);
   assert.match(explorer, /MAP_STATION_LIMIT = 8/);
   assert.match(explorer, /mapStations/);
-  assert.match(explorer, /activeSpecialFuel \? "diesel_a" : nextFuel/);
+  assert.match(explorer, /activeSpecialFuel \? DEFAULT_FUEL : nextFuel/);
   assert.match(explorer, /refitKey=\{fuel\}/);
   assert.match(explorer, /gasoliguapis:favorites/);
+  assert.match(explorer, /gasoliguapis:fuel/);
   assert.match(explorer, /GUARDADAS EN ESTE DISPOSITIVO/);
   assert.match(explorer, /Confirmar datos/);
   assert.match(explorer, /radiusOptions/);
