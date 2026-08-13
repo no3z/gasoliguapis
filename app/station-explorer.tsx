@@ -90,6 +90,7 @@ const fuelOptions: { code: FuelCode; label: string; short: string }[] = [
   { code: "adblue", label: "AdBlue", short: "AdBlue" },
 ];
 const radiusOptions = [10, 25, 50, 75, 100, 200] as const;
+const MAP_STATION_LIMIT = 8;
 const ratingOptions: { code: RatingDimension; label: string }[] = [
   { code: "overall", label: "Parada" },
   { code: "bathroom", label: "Baños" },
@@ -357,6 +358,28 @@ export default function StationExplorer({
     .filter((station) => !favoritesOnly || favorites.includes(station.id))
     .filter((station) => !mineOnly || Boolean(personalRatings[station.id]?.overall)),
   [favorites, favoritesOnly, mineOnly, officialStations, personalRatings]);
+  const mapStations = useMemo(() => {
+    const areaCenter = mapBounds ? {
+      latitude: (mapBounds.north + mapBounds.south) / 2,
+      longitude: (mapBounds.east + mapBounds.west) / 2,
+    } : null;
+    const reference = location ?? areaCenter;
+    const nearest = [...filteredOfficialStations].sort((left, right) => {
+      if (!reference) return 0;
+      const leftDistance = typeof left.distanceKm === "number"
+        ? left.distanceKm
+        : distanceKm(reference.latitude, reference.longitude, left.latE6 / 1_000_000, left.lngE6 / 1_000_000);
+      const rightDistance = typeof right.distanceKm === "number"
+        ? right.distanceKm
+        : distanceKm(reference.latitude, reference.longitude, right.latE6 / 1_000_000, right.lngE6 / 1_000_000);
+      return leftDistance - rightDistance;
+    }).slice(0, MAP_STATION_LIMIT);
+    const selected = selectedStationId
+      ? filteredOfficialStations.find((station) => station.id === selectedStationId)
+      : null;
+    if (!selected || nearest.some((station) => station.id === selected.id)) return nearest;
+    return [selected, ...nearest.slice(0, MAP_STATION_LIMIT - 1)];
+  }, [filteredOfficialStations, location, mapBounds, selectedStationId]);
   const orderedOfficialStations = useMemo(() => {
     if (!selectedStationId) return filteredOfficialStations;
     const selected = filteredOfficialStations.find((station) => station.id === selectedStationId);
@@ -520,8 +543,13 @@ export default function StationExplorer({
   };
 
   const selectFuel = (nextFuel: FuelCode) => {
-    setFuel(nextFuel);
-    setRequiredProducts((current) => current.filter((product) => product !== nextFuel));
+    const activeSpecialFuel = fuel === nextFuel && (nextFuel === "lpg" || nextFuel === "adblue");
+    const resolvedFuel: FuelCode = activeSpecialFuel ? "diesel_a" : nextFuel;
+    setFuel(resolvedFuel);
+    setRequiredProducts((current) => current.filter((product) => product !== nextFuel && product !== resolvedFuel));
+    setSelectedStationId(null);
+    setFavoritesOnly(false);
+    setMineOnly(false);
     setShowCount(20);
   };
 
@@ -822,7 +850,7 @@ export default function StationExplorer({
         <h1 className="sr-only" id="map-heading">{pageHeading}</h1>
         <div className="map-canvas-shell">
           <StationMap
-            stations={filteredOfficialStations}
+            stations={mapStations}
             selectedId={selectedStationId}
             userLocation={location}
             loading={officialLoading}
@@ -830,6 +858,7 @@ export default function StationExplorer({
             personalRatings={personalOverallRatings}
             radiusKm={radiusKm}
             lockViewport={Boolean(mapBounds)}
+            refitKey={fuel}
             onSelect={(stationId) => { setSelectedStationId(stationId); setActiveNav("map"); }}
             onOpenList={openStationInList}
             onDirections={openDirections}
@@ -896,6 +925,7 @@ export default function StationExplorer({
                   key={option.code}
                   className={fuel === option.code ? "active" : ""}
                   aria-pressed={fuel === option.code}
+                  aria-label={fuel === option.code && (option.code === "lpg" || option.code === "adblue") ? `Desactivar ${option.short} y volver a Diésel` : `Buscar ${option.label}`}
                   onClick={() => selectFuel(option.code)}
                 >
                   {option.code === "adblue" ? <Droplets size={15} /> : <Fuel size={15} />}{option.short}

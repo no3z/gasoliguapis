@@ -43,6 +43,7 @@ type Props = {
   personalRatings: Record<string, number>;
   radiusKm: number;
   lockViewport: boolean;
+  refitKey: string;
   onSelect: (stationId: string) => void;
   onOpenList: (stationId: string) => void;
   onDirections: (stationId: string) => void;
@@ -56,12 +57,44 @@ function formatPrice(micros: number) {
   return `${(micros / 1_000_000).toLocaleString("es-ES", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} €`;
 }
 
-export default function StationMap({ stations, selectedId, userLocation, loading, fuelLabel, personalRatings, radiusKm, lockViewport, onSelect, onOpenList, onDirections, onRequestLocation, onSearchVisibleArea }: Props) {
+function fitVisibleStations(
+  map: MapLibreMap,
+  stations: MapStation[],
+  userLocation: { latitude: number; longitude: number } | null,
+  perspective: boolean,
+  duration: number,
+) {
+  const points = stations.map((station) => [station.lngE6 / 1_000_000, station.latE6 / 1_000_000] as const);
+  if (userLocation) points.push([userLocation.longitude, userLocation.latitude]);
+  if (points.length === 0) {
+    map.fitBounds(SPAIN_BOUNDS, { padding: 22, duration });
+    return;
+  }
+  if (points.length === 1) {
+    map.easeTo({ center: points[0], zoom: 12, pitch: perspective ? 38 : 0, bearing: perspective ? -8 : 0, duration });
+    return;
+  }
+  const longitudes = points.map(([longitude]) => longitude);
+  const latitudes = points.map(([, latitude]) => latitude);
+  map.fitBounds([
+    [Math.min(...longitudes), Math.min(...latitudes)],
+    [Math.max(...longitudes), Math.max(...latitudes)],
+  ], {
+    padding: 54,
+    maxZoom: 13,
+    pitch: perspective ? 38 : 0,
+    bearing: perspective ? -8 : 0,
+    duration,
+  });
+}
+
+export default function StationMap({ stations, selectedId, userLocation, loading, fuelLabel, personalRatings, radiusKm, lockViewport, refitKey, onSelect, onOpenList, onDirections, onRequestLocation, onSearchVisibleArea }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markersRef = useRef<MapLibreMarker[]>([]);
   const userMarkerRef = useRef<MapLibreMarker | null>(null);
   const onSelectRef = useRef(onSelect);
+  const lastFittedKeyRef = useRef<string | null>(null);
   const [ready, setReady] = useState(false);
   const [mapError, setMapError] = useState(false);
   const [perspective, setPerspective] = useState(false);
@@ -161,34 +194,12 @@ export default function StationMap({ stations, selectedId, userLocation, loading
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !ready) return;
-    if (lockViewport) return;
-    if (userLocation) {
-      const latDelta = radiusKm / 111;
-      const lngDelta = radiusKm / (111 * Math.max(.2, Math.cos(userLocation.latitude * Math.PI / 180)));
-      map.fitBounds([
-        [userLocation.longitude - lngDelta, userLocation.latitude - latDelta],
-        [userLocation.longitude + lngDelta, userLocation.latitude + latDelta],
-      ], {
-        padding: 54,
-        maxZoom: 12,
-        pitch: perspective ? 38 : 0,
-        bearing: perspective ? -8 : 0,
-        duration: 650,
-      });
-      return;
-    }
-    if (mappableStations.length === 0) {
-      map.fitBounds(SPAIN_BOUNDS, { padding: 22, duration: 500 });
-      return;
-    }
-    const longitudes = mappableStations.map((station) => station.lngE6 / 1_000_000);
-    const latitudes = mappableStations.map((station) => station.latE6 / 1_000_000);
-    map.fitBounds([
-      [Math.min(...longitudes), Math.min(...latitudes)],
-      [Math.max(...longitudes), Math.max(...latitudes)],
-    ], { padding: 52, maxZoom: 12, duration: 650 });
-  }, [lockViewport, mappableStations, perspective, radiusKm, ready, userLocation]);
+    if (!map || !ready || loading) return;
+    const filterChanged = lastFittedKeyRef.current !== refitKey;
+    if (lockViewport && !filterChanged) return;
+    lastFittedKeyRef.current = refitKey;
+    fitVisibleStations(map, mappableStations, userLocation, perspective, 650);
+  }, [loading, lockViewport, mappableStations, perspective, ready, refitKey, userLocation]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -223,16 +234,7 @@ export default function StationMap({ stations, selectedId, userLocation, loading
   const recenter = () => {
     const map = mapRef.current;
     if (!map) return;
-    if (!userLocation) {
-      map.fitBounds(SPAIN_BOUNDS, { padding: 22, duration: 600 });
-      return;
-    }
-    const latDelta = radiusKm / 111;
-    const lngDelta = radiusKm / (111 * Math.max(.2, Math.cos(userLocation.latitude * Math.PI / 180)));
-    map.fitBounds([
-      [userLocation.longitude - lngDelta, userLocation.latitude - latDelta],
-      [userLocation.longitude + lngDelta, userLocation.latitude + latDelta],
-    ], { padding: 54, maxZoom: 12, duration: 600 });
+    fitVisibleStations(map, mappableStations, userLocation, perspective, 600);
   };
 
   const setPerspectiveMode = (enabled: boolean) => {
@@ -273,7 +275,7 @@ export default function StationMap({ stations, selectedId, userLocation, loading
       {mapError ? <div className="map-loading error"><MapPin size={24} /><strong>No se pudo cargar el mapa</strong><span>La lista sigue disponible más abajo.</span><button onClick={retryMap}>Reintentar</button></div> : null}
       {ready && showAreaSearch ? <button className="map-search-area" onClick={searchVisibleArea}><Search size={17} /> Buscar en esta zona</button> : null}
       <div className={`map-toolbar ${selectedStation ? "with-selection" : ""}`}>
-        <div className="map-toolbar-count"><MapPin size={14} /><strong>{mappableStations.length}</strong><span>{userLocation ? `a ${radiusKm} km` : "en el mapa"}{visiblePersonalRatingCount ? ` · ★ ${visiblePersonalRatingCount} tuyas` : ""}{loading ? " · actualizando…" : ""}</span></div>
+        <div className="map-toolbar-count"><MapPin size={14} /><strong>{mappableStations.length}</strong><span>{userLocation ? `más cercanas · radio ${radiusKm} km` : "en el mapa"}{visiblePersonalRatingCount ? ` · ★ ${visiblePersonalRatingCount} tuyas` : ""}{loading ? " · actualizando…" : ""}</span></div>
         <button className="map-location-action" onClick={userLocation ? () => { recenter(); onRequestLocation(); } : onRequestLocation}>
           <LocateFixed size={16} /><span>{userLocation ? "Mi posición" : "Usar ubicación"}</span>
         </button>

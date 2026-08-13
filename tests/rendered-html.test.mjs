@@ -190,6 +190,8 @@ test("connects the filtered station list to an interactive map", async () => {
   assert.match(map, /setPerspectiveMode/);
   assert.match(map, /map-toolbar/);
   assert.match(map, /mappableStations/);
+  assert.match(map, /fitVisibleStations/);
+  assert.match(map, /lastFittedKeyRef/);
   assert.match(map, /offset: \[0, -7\]/);
   assert.match(css, /\.map-station-marker \{[^}]*position: absolute;/);
   assert.doesNotMatch(css, /\.map-station-marker \{[^}]*position: relative;/);
@@ -208,6 +210,10 @@ test("connects the filtered station list to an interactive map", async () => {
   assert.match(explorer, /km de la seleccionada/);
   assert.match(explorer, /serviceFilters/);
   assert.match(explorer, /personalRatings/);
+  assert.match(explorer, /MAP_STATION_LIMIT = 8/);
+  assert.match(explorer, /mapStations/);
+  assert.match(explorer, /activeSpecialFuel \? "diesel_a" : nextFuel/);
+  assert.match(explorer, /refitKey=\{fuel\}/);
   assert.match(explorer, /gasoliguapis:favorites/);
   assert.match(explorer, /GUARDADAS EN ESTE DISPOSITIVO/);
   assert.match(explorer, /Confirmar datos/);
