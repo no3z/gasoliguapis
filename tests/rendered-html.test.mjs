@@ -120,6 +120,9 @@ test("keeps product metadata and removes the disposable starter", async () => {
   await access(new URL("../app/sitemap.ts", import.meta.url));
   await access(new URL("../app/manifest.ts", import.meta.url));
   await access(new URL(".openai/drizzle/0000_right_newton_destine.sql", templateRoot));
+  await access(new URL("../dist/.openai/drizzle/0000_right_newton_destine.sql", import.meta.url));
+  const packagedMigrations = JSON.parse(await readFile(new URL("../dist/.openai/drizzle/meta/_journal.json", import.meta.url), "utf8"));
+  assert.equal(packagedMigrations.entries.length, 3);
 });
 
 test("publishes crawlable SEO files on the custom domain", async () => {
