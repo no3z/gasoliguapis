@@ -1,0 +1,4 @@
+interface:
+  display_name: "Maintain Gasoliguapis"
+  short_description: "Maintain and deploy the Gasoliguapis website"
+  default_prompt: "Use $maintain-gasoliguapis to update and safely deploy the Gasoliguapis website."
