@@ -99,10 +99,12 @@ test("publishes contact, privacy and cookie information before advertising", asy
 });
 
 test("keeps product metadata and removes the disposable starter", async () => {
-  const [page, layout, stationExplorer, packageJson] = await Promise.all([
+  const [page, layout, stationExplorer, analytics, analyticsConfig, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/station-explorer.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/analytics.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/config/analytics/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
 
@@ -112,6 +114,12 @@ test("keeps product metadata and removes the disposable starter", async () => {
   assert.match(layout, /og\.png/);
   assert.match(layout, /max-image-preview/);
   assert.match(stationExplorer, /Continuar con Google/);
+  assert.match(layout, /AnalyticsConsent/);
+  assert.match(analytics, /analytics_storage: "denied"/);
+  assert.match(analytics, /ad_personalization: "denied"/);
+  assert.match(analytics, /Aceptar analítica/);
+  assert.match(analytics, /gasoliguapisAnalyticsConsent !== true/);
+  assert.match(analyticsConfig, /GA_MEASUREMENT_ID/);
   assert.doesNotMatch(stationExplorer, /Continuar con ChatGPT|Facebook/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview/SkeletonPreview.tsx", import.meta.url)));
@@ -233,6 +241,9 @@ test("connects the filtered station list to an interactive map", async () => {
   assert.match(map, /visiblePublicRatingCount/);
   assert.match(explorer, /Media de la comunidad/);
   assert.match(explorer, /rating-stars-display/);
+  assert.match(explorer, /trackAnalyticsEvent\("get_directions"/);
+  assert.match(explorer, /trackAnalyticsEvent\("rate_station"/);
+  assert.match(explorer, /trackAnalyticsEvent\("use_location"/);
   assert.match(map, /radiusKm/);
   assert.match(css, /rating-low/);
   assert.match(css, /rating-mid/);

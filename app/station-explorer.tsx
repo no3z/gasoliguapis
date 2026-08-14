@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { trackAnalyticsEvent } from "./analytics";
 import { displayProvince, PROVINCES } from "./provinces";
 import { CONTACT_EMAIL, legalNavigation } from "./site-config";
 import StationMap, { type VisibleMapBounds } from "./station-map";
@@ -250,9 +251,18 @@ export default function StationExplorer({
   ), [personalRatings]);
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => setSearchTerm(query.trim()), 320);
+    const timeout = window.setTimeout(() => {
+      const normalized = query.trim();
+      setSearchTerm(normalized);
+      if (normalized.length >= 3) trackAnalyticsEvent("search", {
+        search_term: "station_text",
+        query_length: normalized.length,
+        fuel,
+        scope: province ? "province" : location ? "nearby" : "national",
+      });
+    }, 320);
     return () => window.clearTimeout(timeout);
-  }, [query]);
+  }, [fuel, location, province, query]);
 
   useEffect(() => {
     try {
@@ -454,6 +464,7 @@ export default function StationExplorer({
     setShowCount(20);
     setActiveNav("map");
     showToast("Buscando en toda el área visible");
+    trackAnalyticsEvent("search_map_area", { fuel });
   };
 
   const showMap = () => {
@@ -494,6 +505,7 @@ export default function StationExplorer({
     setSelectedStationId(stationId);
     setActiveNav("map");
     window.requestAnimationFrame(() => document.getElementById("mapa")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    trackAnalyticsEvent("select_content", { content_type: "station_map", item_id: stationId });
   };
 
   const openStationInList = (stationId: string) => {
@@ -501,6 +513,7 @@ export default function StationExplorer({
     setActiveNav("search");
     setShowCount((current) => Math.max(current, 20));
     window.setTimeout(() => document.getElementById(`station-${stationId.replace(/[^a-zA-Z0-9_-]/g, "-")}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+    trackAnalyticsEvent("select_content", { content_type: "station_card", item_id: stationId });
   };
 
   const openDirections = (stationId: string) => {
@@ -514,6 +527,7 @@ export default function StationExplorer({
       try { window.localStorage.setItem("gasoliguapis:favorites", JSON.stringify(next)); } catch {
         // Favorites remain available for this visit if storage is unavailable.
       }
+      trackAnalyticsEvent(current.includes(id) ? "remove_favorite" : "add_to_wishlist", { item_id: String(id) });
       return next;
     });
   };
@@ -525,6 +539,7 @@ export default function StationExplorer({
     setSelectedStationId(null);
     setShowCount(20);
     if (!location && !locationLoading) requestMyLocation();
+    trackAnalyticsEvent("select_search_radius", { radius_km: nextRadius, fuel });
   };
 
   const toggleMineOnly = () => {
@@ -548,6 +563,7 @@ export default function StationExplorer({
       ? current.filter((item) => item !== service)
       : [...current, service]);
     setShowCount(20);
+    trackAnalyticsEvent("select_service_filter", { service, enabled: !serviceFilters.includes(service) });
   };
 
   const selectFuel = (nextFuel: FuelCode) => {
@@ -561,6 +577,7 @@ export default function StationExplorer({
     setFavoritesOnly(false);
     setMineOnly(false);
     setShowCount(20);
+    trackAnalyticsEvent("select_fuel", { fuel: resolvedFuel });
   };
 
   const clearFilters = () => {
@@ -599,6 +616,7 @@ export default function StationExplorer({
         setShowCount(20);
         setLocationLoading(false);
         showToast(`Mostrando estaciones a menos de ${radiusKm} km`);
+        trackAnalyticsEvent("use_location", { method: "manual", radius_km: radiusKm });
       },
       () => {
         setLocationLoading(false);
@@ -628,6 +646,7 @@ export default function StationExplorer({
         setSort("distance");
         setShowCount(20);
         setLocationLoading(false);
+        trackAnalyticsEvent("use_location", { method: "automatic", radius_km: radiusKm });
       },
       () => {
         setLocationLoading(false);
@@ -726,6 +745,7 @@ export default function StationExplorer({
     setSessionUser((current) => ({ signedIn: true, displayName: current.displayName }));
     const dimensionLabel = ratingOptions.find((item) => item.code === ratingDimension)?.label.toLowerCase() || "parada";
     showToast(`Tu valoración de ${dimensionLabel}: ${value} estrellas`);
+    trackAnalyticsEvent("rate_station", { station_id: stationId, dimension: ratingDimension, value });
   };
 
   const openConfirmation = (station: OfficialStation, category?: ConfirmationCategory) => {
@@ -783,6 +803,12 @@ export default function StationExplorer({
       setSessionUser((current) => ({ signedIn: true, displayName: current.displayName }));
       setConfirmationStation(null);
       showToast(payload.confirmation.proximityVerified ? "Confirmación guardada · cercanía comprobada" : "Confirmación guardada");
+      trackAnalyticsEvent("confirm_station_service", {
+        station_id: confirmationStation.id,
+        category: confirmationCategory,
+        status,
+        proximity_verified: payload.confirmation.proximityVerified,
+      });
     } catch {
       showToast("No se pudo guardar la confirmación");
     } finally {
@@ -869,7 +895,7 @@ export default function StationExplorer({
             radiusKm={radiusKm}
             lockViewport={Boolean(mapBounds)}
             refitKey={fuel}
-            onSelect={(stationId) => { setSelectedStationId(stationId); setActiveNav("map"); }}
+            onSelect={(stationId) => { setSelectedStationId(stationId); setActiveNav("map"); trackAnalyticsEvent("select_content", { content_type: "map_marker", item_id: stationId }); }}
             onOpenList={openStationInList}
             onDirections={openDirections}
             onRequestLocation={requestMyLocation}
@@ -893,13 +919,15 @@ export default function StationExplorer({
                 id="province-select"
                 value={province}
                 onChange={(event) => {
-                  setProvince(event.target.value);
+                  const nextProvince = event.target.value;
+                  setProvince(nextProvince);
                   setLocation(null);
                   setMapBounds(null);
                   setFavoritesOnly(false);
                   setMineOnly(false);
                   setSort("price");
                   setShowCount(20);
+                  trackAnalyticsEvent("select_search_area", { scope: nextProvince ? "province" : "national", province: nextProvince || "all" });
                 }}
                 aria-label="Selecciona toda España o una provincia"
               >
@@ -967,7 +995,7 @@ export default function StationExplorer({
             <span className="result-kicker">{favoritesOnly ? "GUARDADAS EN ESTE DISPOSITIVO" : mineOnly ? "VALORADAS POR TI" : mapBounds ? "ÁREA VISIBLE · MITECO" : "CATÁLOGO OFICIAL · MITECO"}</span>
             <h2>{officialLoading ? "Buscando paradas…" : favoritesOnly ? `${filteredOfficialStations.length.toLocaleString("es-ES")} guardadas en estos resultados` : mineOnly ? `${filteredOfficialStations.length.toLocaleString("es-ES")} puntuadas por ti` : `${officialTotal.toLocaleString("es-ES")} con ${selectedFuel.label}`}</h2>
           </div>
-          <label className="result-sort"><ListFilter size={14} /><select value={selectedStationId ? "selected" : sort} onChange={(event) => { setSelectedStationId(null); setSort(event.target.value as SortMode); setShowCount(20); }} aria-label="Ordenar resultados">{selectedStationId ? <option value="selected">Seleccionada + cercanas</option> : null}<option value="price">Más baratas</option><option value="rating">Mejor puntuadas</option><option value="distance" disabled={!location}>Más cercanas</option></select></label>
+          <label className="result-sort"><ListFilter size={14} /><select value={selectedStationId ? "selected" : sort} onChange={(event) => { const nextSort = event.target.value as SortMode; setSelectedStationId(null); setSort(nextSort); setShowCount(20); trackAnalyticsEvent("select_sort", { sort: nextSort }); }} aria-label="Ordenar resultados">{selectedStationId ? <option value="selected">Seleccionada + cercanas</option> : null}<option value="price">Más baratas</option><option value="rating">Mejor puntuadas</option><option value="distance" disabled={!location}>Más cercanas</option></select></label>
         </div>
 
         <p className="official-context"><ShieldCheck size={14} /> {favoritesOnly ? "Tus guardadas se conservan en este dispositivo y respetan los filtros actuales." : mineOnly ? "Mostramos únicamente las estaciones a las que ya has dado una nota general." : mapBounds ? "Estaciones dentro del rectángulo visible del mapa; mueve el mapa para buscar en otra zona." : location ? `Estaciones en un radio de ${radiusKm} km; la distancia es en línea recta.` : province ? `Resultados oficiales en ${provinceLabel}.` : "Búsqueda nacional en toda España."} Precio y disponibilidad procedentes de MITECO.</p>
@@ -1092,8 +1120,8 @@ export default function StationExplorer({
             <div className="modal-title"><div><span>ABRIR NAVEGACIÓN</span><h2>¿Con qué mapa?</h2></div><button onClick={() => setDirectionsStation(null)} aria-label="Cerrar"><X /></button></div>
             <p><MapPin size={14} /> {directionsStation.name} · {directionsStation.municipality}</p>
             <div className="directions-options">
-              <a href={`https://www.google.com/maps/dir/?api=1&destination=${directionsStation.latE6 / 1_000_000},${directionsStation.lngE6 / 1_000_000}&travelmode=driving`} target="_blank" rel="noreferrer" onClick={() => setDirectionsStation(null)}><span className="maps-logo google">G</span><div><strong>Google Maps</strong><small>Abrir ruta en coche</small></div><Navigation size={18} /></a>
-              <a href={`https://maps.apple.com/?daddr=${directionsStation.latE6 / 1_000_000},${directionsStation.lngE6 / 1_000_000}&dirflg=d`} target="_blank" rel="noreferrer" onClick={() => setDirectionsStation(null)}><span className="maps-logo apple">A</span><div><strong>Apple Maps</strong><small>Abrir ruta en coche</small></div><Navigation size={18} /></a>
+              <a href={`https://www.google.com/maps/dir/?api=1&destination=${directionsStation.latE6 / 1_000_000},${directionsStation.lngE6 / 1_000_000}&travelmode=driving`} target="_blank" rel="noreferrer" onClick={() => { trackAnalyticsEvent("get_directions", { provider: "google_maps", station_id: directionsStation.id }); setDirectionsStation(null); }}><span className="maps-logo google">G</span><div><strong>Google Maps</strong><small>Abrir ruta en coche</small></div><Navigation size={18} /></a>
+              <a href={`https://maps.apple.com/?daddr=${directionsStation.latE6 / 1_000_000},${directionsStation.lngE6 / 1_000_000}&dirflg=d`} target="_blank" rel="noreferrer" onClick={() => { trackAnalyticsEvent("get_directions", { provider: "apple_maps", station_id: directionsStation.id }); setDirectionsStation(null); }}><span className="maps-logo apple">A</span><div><strong>Apple Maps</strong><small>Abrir ruta en coche</small></div><Navigation size={18} /></a>
             </div>
             <small className="directions-note">La navegación se abre fuera de Gasoliguapis con las coordenadas oficiales de la estación.</small>
           </section>
@@ -1161,7 +1189,7 @@ export default function StationExplorer({
               <>
                 <h2>Haz mejores las paradas</h2>
                 <p>Inicia sesión para puntuar la parada, los baños, el café o la limpieza. Sin comentarios públicos.</p>
-                <a className="social google" href={signInPath}><b aria-hidden="true">G</b> Continuar con Google</a>
+                <a className="social google" href={signInPath} onClick={() => trackAnalyticsEvent("login_start", { method: "Google" })}><b aria-hidden="true">G</b> Continuar con Google</a>
                 <small><ShieldCheck size={14} /> Nunca publicaremos nada sin tu permiso.</small>
               </>
             )}
