@@ -218,6 +218,8 @@ test("connects the filtered station list to an interactive map", async () => {
   assert.match(map, /fitVisibleStations/);
   assert.match(map, /lastFittedKeyRef/);
   assert.match(map, /offset: \[0, -7\]/);
+  assert.match(map, /className="map-viewport"/);
+  assert.match(map, /map-viewport[\s\S]*map-toolbar[\s\S]*<\/div>\s*\{selectedStation/);
   assert.match(css, /\.map-station-marker \{[^}]*position: absolute;/);
   assert.doesNotMatch(css, /\.map-station-marker \{[^}]*position: relative;/);
   assert.match(map, /onRequestLocation/);
@@ -252,6 +254,9 @@ test("connects the filtered station list to an interactive map", async () => {
   assert.match(map, /visiblePublicRatingCount/);
   assert.match(explorer, /Media de la comunidad/);
   assert.match(explorer, /rating-stars-display/);
+  assert.match(explorer, /advanceRatingFlow/);
+  assert.match(explorer, /Paso \{ratingOptions\.findIndex/);
+  assert.match(explorer, /Al tocar una estrella pasas al siguiente paso/);
   assert.match(explorer, /trackAnalyticsEvent\("get_directions"/);
   assert.match(explorer, /trackAnalyticsEvent\("rate_station"/);
   assert.match(explorer, /trackAnalyticsEvent\("use_location"/);
@@ -259,7 +264,9 @@ test("connects the filtered station list to an interactive map", async () => {
   assert.match(css, /rating-low/);
   assert.match(css, /rating-mid/);
   assert.match(css, /rating-high/);
-  assert.match(css, /\.map-stage\.advanced \{[^}]*height: clamp\(330px, 50dvh, 460px\)/);
+  assert.match(css, /\.map-viewport \{[^}]*height: clamp\(390px, 58dvh, 520px\)/);
+  assert.match(css, /\.map-stage\.advanced \.map-viewport \{[^}]*height: clamp\(500px, 66dvh, 620px\)/);
+  assert.match(css, /\.map-selection \{[^}]*position: relative;/);
   assert.doesNotMatch(css, /\.map-stage\.advanced \{[^}]*height: calc\(100dvh/);
   assert.match(stationsApi, /sortParam === "rating"/);
   assert.match(stationsApi, /hasMapBounds/);

@@ -221,6 +221,7 @@ export default function StationExplorer({
   }>({ key: "", stations: [], total: 0, error: "" });
   const [ratingStation, setRatingStation] = useState<string | null>(null);
   const [ratingDimension, setRatingDimension] = useState<RatingDimension>("overall");
+  const [ratingSaving, setRatingSaving] = useState(false);
   const [confirmationStation, setConfirmationStation] = useState<OfficialStation | null>(null);
   const [directionsStation, setDirectionsStation] = useState<OfficialStation | null>(null);
   const [confirmationCategory, setConfirmationCategory] = useState<ConfirmationCategory>("bathroom");
@@ -695,57 +696,87 @@ export default function StationExplorer({
     }
   };
 
-  const rateStation = async (stationId: string, value: number) => {
+  const openRatingFlow = (stationId: string) => {
+    if (ratingStation === stationId) {
+      setRatingStation(null);
+      return;
+    }
+    const firstPending = ratingOptions.find((option) => !personalRatings[stationId]?.[option.code]);
+    setRatingDimension(firstPending?.code ?? "overall");
+    setRatingStation(stationId);
+  };
+
+  const advanceRatingFlow = (dimension: RatingDimension) => {
+    const currentIndex = ratingOptions.findIndex((option) => option.code === dimension);
+    const nextOption = ratingOptions[currentIndex + 1];
+    if (nextOption) {
+      setRatingDimension(nextOption.code);
+      return nextOption;
+    }
     setRatingStation(null);
+    return null;
+  };
+
+  const rateStation = async (stationId: string, value: number) => {
+    if (ratingSaving) return;
+    const dimension = ratingDimension;
     const station = officialStations.find((item) => item.id === stationId);
-    const response = await fetch(`/api/stations/${encodeURIComponent(stationId)}/ratings/${ratingDimension}`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        value,
-        station: station ? {
-          name: station.name,
-          brand: station.brand,
-          address: station.address,
-          municipality: station.municipality,
-          province: station.province,
-          latE6: station.latE6,
-          lngE6: station.lngE6,
-        } : undefined,
-      }),
-    });
-    if (response.status === 401) {
-      await openLogin();
-      return;
-    }
-    if (!response.ok) {
-      showToast("No se pudo guardar tu valoración");
-      return;
-    }
-    const payload = await response.json() as { stats?: { average: number; count: number } };
-    if (payload.stats) {
-      const ratingField = `${ratingDimension}Rating` as "overallRating" | "bathroomRating" | "coffeeRating" | "cleanlinessRating";
-      const countField = `${ratingDimension}Count` as "overallCount" | "bathroomCount" | "coffeeCount" | "cleanlinessCount";
-      setOfficialState((current) => ({
+    setRatingSaving(true);
+    try {
+      const response = await fetch(`/api/stations/${encodeURIComponent(stationId)}/ratings/${dimension}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          value,
+          station: station ? {
+            name: station.name,
+            brand: station.brand,
+            address: station.address,
+            municipality: station.municipality,
+            province: station.province,
+            latE6: station.latE6,
+            lngE6: station.lngE6,
+          } : undefined,
+        }),
+      });
+      if (response.status === 401) {
+        await openLogin();
+        return;
+      }
+      if (!response.ok) {
+        showToast("No se pudo guardar tu valoración");
+        return;
+      }
+      const payload = await response.json() as { stats?: { average: number; count: number } };
+      if (payload.stats) {
+        const ratingField = `${dimension}Rating` as "overallRating" | "bathroomRating" | "coffeeRating" | "cleanlinessRating";
+        const countField = `${dimension}Count` as "overallCount" | "bathroomCount" | "coffeeCount" | "cleanlinessCount";
+        setOfficialState((current) => ({
+          ...current,
+          stations: current.stations.map((station) => station.id === stationId
+            ? {
+                ...station,
+                [ratingField]: payload.stats?.average,
+                [countField]: payload.stats?.count,
+                ...(dimension === "overall" ? { overallRankScore: weightedRating(payload.stats?.average, payload.stats?.count) } : {}),
+              }
+            : station),
+        }));
+      }
+      setPersonalRatings((current) => ({
         ...current,
-        stations: current.stations.map((station) => station.id === stationId
-          ? {
-              ...station,
-              [ratingField]: payload.stats?.average,
-              [countField]: payload.stats?.count,
-              ...(ratingDimension === "overall" ? { overallRankScore: weightedRating(payload.stats?.average, payload.stats?.count) } : {}),
-            }
-          : station),
+        [stationId]: { ...current[stationId], [dimension]: value },
       }));
+      setSessionUser((current) => ({ signedIn: true, displayName: current.displayName }));
+      const dimensionLabel = ratingOptions.find((item) => item.code === dimension)?.label.toLowerCase() || "parada";
+      const nextOption = advanceRatingFlow(dimension);
+      showToast(nextOption ? `${dimensionLabel}: ${value}/5 · ahora ${nextOption.label.toLowerCase()}` : "¡Valoración completa! Gracias por ayudar");
+      trackAnalyticsEvent("rate_station", { station_id: stationId, dimension, value });
+    } catch {
+      showToast("No se pudo guardar tu valoración");
+    } finally {
+      setRatingSaving(false);
     }
-    setPersonalRatings((current) => ({
-      ...current,
-      [stationId]: { ...current[stationId], [ratingDimension]: value },
-    }));
-    setSessionUser((current) => ({ signedIn: true, displayName: current.displayName }));
-    const dimensionLabel = ratingOptions.find((item) => item.code === ratingDimension)?.label.toLowerCase() || "parada";
-    showToast(`Tu valoración de ${dimensionLabel}: ${value} estrellas`);
-    trackAnalyticsEvent("rate_station", { station_id: stationId, dimension: ratingDimension, value });
   };
 
   const openConfirmation = (station: OfficialStation, category?: ConfirmationCategory) => {
@@ -1035,7 +1066,7 @@ export default function StationExplorer({
                 {stationHighlights(station).map((item) => <div className={item.className} key={item.label}><span>{item.label}</span><strong>{item.value}</strong><small>{item.detail}</small></div>)}
               </div>
               <div className="official-source"><Check size={13} /> MITECO · {formatOfficialTime(station.priceObservedAt)}</div>
-              <button className={`overall-score ${personalRatings[station.id]?.overall ? "user-rated" : ""}`} onClick={() => { setRatingStation(station.id); setRatingDimension("overall"); }}>
+              <button className={`overall-score ${personalRatings[station.id]?.overall ? "user-rated" : ""}`} onClick={() => openRatingFlow(station.id)}>
                 <span className="overall-public-rating">{station.overallCount ? <><b>{Number(station.overallRating).toFixed(1)}</b><span><RatingStars value={Number(station.overallRating)} /><small>Media de la comunidad</small></span></> : <><Star size={15} fill="currentColor" /><span>Sin puntuación</span></>}</span>
                 <span className="overall-rating-detail"><small>{station.overallCount ? `${station.overallCount} ${station.overallCount === 1 ? "voto" : "votos"}` : "Sé la primera persona"}</small><em>{ratingConfidence(station.overallCount)}</em></span>
                 {personalRatings[station.id]?.overall ? <strong>Tu nota {personalRatings[station.id]?.overall}/5</strong> : <strong>Puntuar</strong>}
@@ -1058,16 +1089,18 @@ export default function StationExplorer({
               <div className="official-actions">
                 <button className="map-action" onClick={() => focusStationOnMap(station.id)}><MapPin size={16} /> Ver en mapa</button>
                 <button onClick={() => setDirectionsStation(station)}><Navigation size={16} /> Cómo llegar</button>
-                <button onClick={() => { setRatingStation(ratingStation === station.id ? null : station.id); setRatingDimension("overall"); }}><Star size={16} /> Puntuar</button>
+                <button onClick={() => openRatingFlow(station.id)}><Star size={16} /> Puntuar</button>
               </div>
               {ratingStation === station.id ? (
-                <div className="rating-picker">
-                  <div className="rating-dimensions">{ratingOptions.map((option) => <button className={ratingDimension === option.code ? "active" : ""} key={option.code} onClick={() => setRatingDimension(option.code)}>{option.code === "bathroom" ? <Bath size={13} /> : option.code === "coffee" ? <Coffee size={13} /> : option.code === "cleanliness" ? <Sparkles size={13} /> : <Star size={13} />}{option.label}</button>)}</div>
+                <div className="rating-picker" aria-busy={ratingSaving}>
+                  <div className="rating-flow-head"><strong>Puntúa esta parada</strong><small>Paso {ratingOptions.findIndex((option) => option.code === ratingDimension) + 1} de {ratingOptions.length}</small></div>
+                  <div className="rating-dimensions">{ratingOptions.map((option) => <button className={`${ratingDimension === option.code ? "active" : ""}${personalRatings[station.id]?.[option.code] ? " completed" : ""}`} key={option.code} onClick={() => setRatingDimension(option.code)} disabled={ratingSaving}>{option.code === "bathroom" ? <Bath size={13} /> : option.code === "coffee" ? <Coffee size={13} /> : option.code === "cleanliness" ? <Sparkles size={13} /> : <Star size={13} />}{option.label}{personalRatings[station.id]?.[option.code] ? <b>{personalRatings[station.id]?.[option.code]}/5</b> : null}</button>)}</div>
                   <span>¿Qué nota le das a {ratingOptions.find((item) => item.code === ratingDimension)?.label.toLowerCase()}?</span>
                   <div className="rating-stars">{[1, 2, 3, 4, 5].map((value) => {
                     const selected = value <= (personalRatings[station.id]?.[ratingDimension] || 0);
-                    return <button className={selected ? "active" : ""} key={value} aria-label={`${value} estrellas para ${ratingDimension}`} onClick={() => rateStation(station.id, value)}><Star size={22} fill={selected ? "currentColor" : "none"} /></button>;
+                    return <button className={selected ? "active" : ""} key={value} aria-label={`${value} estrellas para ${ratingDimension}`} onClick={() => rateStation(station.id, value)} disabled={ratingSaving}><Star size={24} fill={selected ? "currentColor" : "none"} /></button>;
                   })}</div>
+                  <div className="rating-flow-foot"><small>{ratingSaving ? "Guardando…" : "Al tocar una estrella pasas al siguiente paso"}</small><button onClick={() => advanceRatingFlow(ratingDimension)} disabled={ratingSaving}>{ratingDimension === ratingOptions.at(-1)?.code ? "Terminar" : "Omitir"}</button></div>
                 </div>
               ) : null}
             </article>

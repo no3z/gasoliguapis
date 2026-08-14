@@ -289,18 +289,20 @@ export default function StationMap({ stations, selectedId, userLocation, loading
 
   return (
     <section className="map-explorer" id="mapa" aria-label="Mapa de gasolineras filtradas">
-      <div ref={containerRef} className="stations-map" />
-      {!ready && !mapError ? <div className="map-loading"><span /><strong>Cargando mapa…</strong></div> : null}
-      {mapError ? <div className="map-loading error"><MapPin size={24} /><strong>No se pudo cargar el mapa</strong><span>La lista sigue disponible más abajo.</span><button onClick={retryMap}>Reintentar</button></div> : null}
-      {ready && showAreaSearch ? <button className="map-search-area" onClick={searchVisibleArea}><Search size={17} /> Buscar en esta zona</button> : null}
-      <div className={`map-toolbar ${selectedStation ? "with-selection" : ""}`}>
-        <div className="map-toolbar-count"><MapPin size={14} /><strong>{mappableStations.length}</strong><span>{userLocation ? `más cercanas · radio ${radiusKm} km` : "en el mapa"}{visiblePublicRatingCount ? ` · ★ ${visiblePublicRatingCount} valoradas` : ""}{visiblePersonalRatingCount ? ` · ${visiblePersonalRatingCount} tuyas` : ""}{loading ? " · actualizando…" : ""}</span></div>
-        <button className="map-location-action" onClick={userLocation ? () => { recenter(); onRequestLocation(); } : onRequestLocation}>
-          <LocateFixed size={16} /><span>{userLocation ? "Mi posición" : "Usar ubicación"}</span>
-        </button>
-        <div className="map-mode-switch" aria-label="Perspectiva del mapa">
-          <button className={!perspective ? "active" : ""} onClick={() => setPerspectiveMode(false)} aria-pressed={!perspective}><Map size={14} />2D</button>
-          <button className={perspective ? "active" : ""} onClick={() => setPerspectiveMode(true)} aria-pressed={perspective}><Layers3 size={14} />3D</button>
+      <div className="map-viewport">
+        <div ref={containerRef} className="stations-map" />
+        {!ready && !mapError ? <div className="map-loading"><span /><strong>Cargando mapa…</strong></div> : null}
+        {mapError ? <div className="map-loading error"><MapPin size={24} /><strong>No se pudo cargar el mapa</strong><span>La lista sigue disponible más abajo.</span><button onClick={retryMap}>Reintentar</button></div> : null}
+        {ready && showAreaSearch ? <button className="map-search-area" onClick={searchVisibleArea}><Search size={17} /> Buscar en esta zona</button> : null}
+        <div className="map-toolbar">
+          <div className="map-toolbar-count"><MapPin size={14} /><strong>{mappableStations.length}</strong><span>{userLocation ? `más cercanas · radio ${radiusKm} km` : "en el mapa"}{visiblePublicRatingCount ? ` · ★ ${visiblePublicRatingCount} valoradas` : ""}{visiblePersonalRatingCount ? ` · ${visiblePersonalRatingCount} tuyas` : ""}{loading ? " · actualizando…" : ""}</span></div>
+          <button className="map-location-action" onClick={userLocation ? () => { recenter(); onRequestLocation(); } : onRequestLocation}>
+            <LocateFixed size={16} /><span>{userLocation ? "Mi posición" : "Usar ubicación"}</span>
+          </button>
+          <div className="map-mode-switch" aria-label="Perspectiva del mapa">
+            <button className={!perspective ? "active" : ""} onClick={() => setPerspectiveMode(false)} aria-pressed={!perspective}><Map size={14} />2D</button>
+            <button className={perspective ? "active" : ""} onClick={() => setPerspectiveMode(true)} aria-pressed={perspective}><Layers3 size={14} />3D</button>
+          </div>
         </div>
       </div>
       {selectedStation ? (
