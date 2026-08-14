@@ -40,7 +40,7 @@ export default function PrivacyPage() {
 
       <section>
         <h2>Destinatarios y proveedores</h2>
-        <p>La web utiliza Google para identificar a quienes deciden iniciar sesión y, únicamente tras aceptar la analítica, para medir el uso mediante Google Analytics 4. También utiliza infraestructura de OpenAI Sites y Cloudflare para alojamiento, almacenamiento y seguridad. El mapa puede solicitar recursos técnicos a OpenFreeMap. Estos proveedores pueden recibir datos técnicos necesarios para entregar sus servicios. No vendemos datos personales ni publicamos el correo de las personas que puntúan.</p>
+        <p>La web utiliza Google para identificar a quienes deciden iniciar sesión, gestionar las elecciones de consentimiento y, cuando la elección aplicable lo permite, medir el uso mediante Google Analytics 4 y mostrar publicidad mediante AdSense. También utiliza infraestructura de OpenAI Sites y Cloudflare para alojamiento, almacenamiento y seguridad. El mapa puede solicitar recursos técnicos a OpenFreeMap. Estos proveedores pueden recibir datos técnicos necesarios para entregar sus servicios. No vendemos datos personales ni publicamos el correo de las personas que puntúan.</p>
       </section>
 
       <section>
@@ -48,7 +48,7 @@ export default function PrivacyPage() {
         <p>Las contribuciones se conservan mientras sean útiles para el servicio o hasta que solicites su supresión, salvo que debamos conservar temporalmente información mínima para atender obligaciones legales o prevenir fraude. Puedes solicitar acceso, rectificación, supresión, oposición, limitación o portabilidad escribiendo a {CONTACT_EMAIL}. También puedes reclamar ante la Agencia Española de Protección de Datos.</p>
       </section>
 
-      <aside className="source-note">Última actualización: 14 de agosto de 2026. Esta política se actualizará antes de activar publicidad o nuevas finalidades de medición.</aside>
+      <aside className="source-note">Última actualización: 14 de agosto de 2026. La publicidad y la analítica respetan las señales recibidas desde la plataforma de consentimiento de Google.</aside>
     </GuideShell>
   );
 }

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
-import AnalyticsConsent from "./analytics";
+import GooglePrivacyMeasurement from "./analytics";
 import { ADSENSE_ACCOUNT, SITE_NAME, SITE_URL } from "./site-config";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -16,6 +16,7 @@ export const metadata: Metadata = {
     template: "%s | Gasoliguapis",
   },
   description: "Compara precios oficiales y encuentra gasolineras con GLP, AdBlue, baños cuidados y buen café en las carreteras de España.",
+  referrer: "strict-origin-when-cross-origin",
   alternates: { canonical: "/" },
   robots: {
     index: true,
@@ -43,5 +44,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="es-ES"><body className={`${geistSans.variable} ${geistMono.variable}`}>{children}<AnalyticsConsent /></body></html>;
+  return <html lang="es-ES"><body className={`${geistSans.variable} ${geistMono.variable}`}>{children}<GooglePrivacyMeasurement /></body></html>;
 }

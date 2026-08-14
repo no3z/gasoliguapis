@@ -81,7 +81,7 @@ test("renders useful province-level GLP pages and lists them in the sitemap", as
   assert.match(sitemapXml, /gasolineras-con-glp\/barcelona/);
 });
 
-test("publishes contact, privacy and cookie information before advertising", async () => {
+test("publishes contact, privacy and cookie information for consent-managed advertising", async () => {
   const [homeResponse, privacyResponse, cookiesResponse] = await Promise.all([
     render("/"),
     render("/privacidad"),
@@ -94,8 +94,9 @@ test("publishes contact, privacy and cookie information before advertising", asy
   assert.match(homeHtml, /aviso-legal/);
   assert.match(privacyHtml, /No guardamos un historial de trayectos/);
   assert.match(privacyHtml, /Agencia Española de Protección de Datos/);
-  assert.match(cookiesHtml, /no tiene actualmente etiquetas publicitarias/i);
-  assert.match(cookiesHtml, /plataforma de consentimiento certificada/i);
+  assert.match(privacyHtml, /Google Analytics 4 y mostrar publicidad mediante AdSense/);
+  assert.match(cookiesHtml, /plataforma de gestión del consentimiento de Google/i);
+  assert.match(cookiesHtml, /etiqueta de Google AdSense/i);
 });
 
 test("keeps product metadata and removes the disposable starter", async () => {
@@ -114,10 +115,14 @@ test("keeps product metadata and removes the disposable starter", async () => {
   assert.match(layout, /og\.png/);
   assert.match(layout, /max-image-preview/);
   assert.match(stationExplorer, /Continuar con Google/);
-  assert.match(layout, /AnalyticsConsent/);
+  assert.match(layout, /GooglePrivacyMeasurement/);
   assert.match(analytics, /analytics_storage: "denied"/);
   assert.match(analytics, /ad_personalization: "denied"/);
-  assert.match(analytics, /Aceptar analítica/);
+  assert.match(analytics, /pagead2\.googlesyndication\.com/);
+  assert.match(analytics, /__tcfapi/);
+  assert.match(analytics, /tcloaded/);
+  assert.match(analytics, /POLICY_PATHS/);
+  assert.doesNotMatch(analytics, /Aceptar analítica|analytics-consent/);
   assert.match(analytics, /gasoliguapisAnalyticsConsent !== true/);
   assert.match(analyticsConfig, /GA_MEASUREMENT_ID/);
   assert.doesNotMatch(stationExplorer, /Continuar con ChatGPT|Facebook/);
