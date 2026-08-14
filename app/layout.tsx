@@ -3,7 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
 import AnalyticsConsent from "./analytics";
-import { SITE_NAME, SITE_URL } from "./site-config";
+import { ADSENSE_ACCOUNT, SITE_NAME, SITE_URL } from "./site-config";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -24,6 +24,7 @@ export const metadata: Metadata = {
   },
   icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
   manifest: "/manifest.webmanifest",
+  other: { "google-adsense-account": ADSENSE_ACCOUNT },
   openGraph: {
     type: "website",
     locale: "es_ES",

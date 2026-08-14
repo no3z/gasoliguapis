@@ -148,6 +148,17 @@ test("publishes crawlable SEO files on the custom domain", async () => {
   assert.doesNotMatch(sitemap, /no3s\.chatgpt\.site/);
 });
 
+test("publishes AdSense ownership verification without loading advertising", async () => {
+  const [homeResponse, adsTxt] = await Promise.all([
+    render("/"),
+    readFile(new URL("../public/ads.txt", import.meta.url), "utf8"),
+  ]);
+  const homeHtml = await homeResponse.text();
+  assert.match(homeHtml, /<meta name="google-adsense-account" content="ca-pub-2200141171782855"\s*\/?\s*>/i);
+  assert.match(adsTxt, /^google\.com, pub-2200141171782855, DIRECT, f08c47fec0942fa0\s*$/);
+  assert.doesNotMatch(homeHtml, /pagead2\.googlesyndication\.com\/pagead\/js\/adsbygoogle\.js/);
+});
+
 test("keeps ratings structured and does not expose a public comment flow", async () => {
   const [explorer, stationsApi, personalRatingsApi, methodology] = await Promise.all([
     readFile(new URL("../app/station-explorer.tsx", import.meta.url), "utf8"),

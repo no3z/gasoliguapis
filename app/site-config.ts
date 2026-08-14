@@ -1,6 +1,7 @@
 export const SITE_NAME = "Gasoliguapis";
 export const SITE_URL = "https://gasoliguapis.es";
 export const CONTACT_EMAIL = "contacto@gasoliguapis.es";
+export const ADSENSE_ACCOUNT = "ca-pub-2200141171782855";
 export const DATA_SNAPSHOT_DATE = "10 de agosto de 2026";
 
 export const primaryNavigation = [
