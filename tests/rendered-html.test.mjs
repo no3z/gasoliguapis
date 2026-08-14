@@ -198,7 +198,8 @@ test("ships temporary community confirmations without persisting location", asyn
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
     readFile(new URL("../.openai/drizzle/0002_classy_iron_man.sql", import.meta.url), "utf8"),
   ]);
-  assert.match(explorer, /Confirmar GLP, AdBlue o servicios/);
+  assert.match(explorer, /Actualizar información de servicios/);
+  assert.doesNotMatch(explorer, /10 s/);
   assert.match(explorer, /Nuestra propuesta cerca de ti/i);
   assert.match(explorer, /Tu ubicación no se guarda/);
   assert.match(confirmationApi, /proximityVerified/);
@@ -249,13 +250,15 @@ test("connects the filtered station list to an interactive map", async () => {
   assert.match(explorer, /gasoliguapis:favorites/);
   assert.match(explorer, /gasoliguapis:fuel/);
   assert.match(explorer, /GUARDADAS EN ESTE DISPOSITIVO/);
-  assert.match(explorer, /Confirmar datos/);
+  assert.match(explorer, /Confirmar información/);
   assert.match(explorer, /radiusOptions/);
   assert.match(explorer, /Radio desde mí/);
   assert.match(explorer, /Valoradas por mí/);
   assert.doesNotMatch(explorer, /Abierto 24 h.*pronto|Duchas.*pronto/);
   assert.match(map, /map-marker-user-rating/);
   assert.match(map, /map-marker-public-rating/);
+  assert.match(map, /selectedRatings/);
+  assert.doesNotMatch(map, /Sin dato/);
   assert.match(map, /visiblePublicRatingCount/);
   assert.match(explorer, /Media de la comunidad/);
   assert.match(explorer, /rating-stars-display/);

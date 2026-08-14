@@ -146,7 +146,7 @@ function ratingConfidence(count = 0) {
   if (count >= 20) return "Confianza alta";
   if (count >= 5) return "Confianza media";
   if (count > 0) return "Pocos votos";
-  return "Sin votos";
+  return "";
 }
 
 function RatingStars({ value }: { value: number }) {
@@ -492,16 +492,6 @@ export default function StationExplorer({
     if (favorites.length === 0) showToast("Guarda una parada con el corazón para verla aquí");
   };
 
-  const contributeStation = selectedOfficialStation ?? recommendedStation ?? officialStations[0] ?? null;
-  const contribute = () => {
-    if (!contributeStation) {
-      showToast("Busca y selecciona una estación para confirmar sus datos");
-      showMap();
-      return;
-    }
-    openConfirmation(contributeStation);
-  };
-
   const focusStationOnMap = (stationId: string) => {
     setSelectedStationId(stationId);
     setActiveNav("map");
@@ -696,13 +686,13 @@ export default function StationExplorer({
     }
   };
 
-  const openRatingFlow = (stationId: string) => {
-    if (ratingStation === stationId) {
+  const openRatingFlow = (stationId: string, dimension?: RatingDimension) => {
+    if (ratingStation === stationId && (!dimension || ratingDimension === dimension)) {
       setRatingStation(null);
       return;
     }
-    const firstPending = ratingOptions.find((option) => !personalRatings[stationId]?.[option.code]);
-    setRatingDimension(firstPending?.code ?? "overall");
+    const firstPending = dimension ? null : ratingOptions.find((option) => !personalRatings[stationId]?.[option.code]);
+    setRatingDimension(dimension ?? firstPending?.code ?? "overall");
     setRatingStation(stationId);
   };
 
@@ -875,6 +865,32 @@ export default function StationExplorer({
     if (recent === "poor") return "Aviso reciente";
     if (recent === "closed") return "Cerrado ahora";
     return null;
+  };
+
+  const serviceRatingHighlights = (station: OfficialStation) => [
+    { code: "bathroom" as const, label: "Baños", icon: <Bath size={14} />, rating: station.bathroomRating, count: station.bathroomCount },
+    { code: "coffee" as const, label: "Café", icon: <Coffee size={14} />, rating: station.coffeeRating, count: station.coffeeCount },
+    { code: "cleanliness" as const, label: "Limpieza", icon: <Sparkles size={14} />, rating: station.cleanlinessRating, count: station.cleanlinessCount },
+  ].filter((service): service is typeof service & { rating: number; count: number } => typeof service.rating === "number" && Number(service.count) > 0);
+
+  const recentCommunityNotes = (station: OfficialStation) => {
+    const notes: Array<{ code: string; label: string; detail: string }> = [];
+    if ((fuel === "lpg" || fuel === "adblue") && recentConfirmation(station.fuelCommunityStatus, station.fuelCommunityAt)) {
+      const detail = station.fuelCommunityStatus === "working"
+        ? "Funcionaba"
+        : station.fuelCommunityStatus === "broken" ? "Surtidor averiado" : "No había producto";
+      notes.push({ code: "fuel", label: selectedFuel.label, detail: `${detail} · ${confirmationAge(station.fuelCommunityAt)}` });
+    }
+    [
+      { code: "bathroom", label: "Baños", status: station.bathroomStatus, statusAt: station.bathroomStatusAt },
+      { code: "coffee", label: "Café", status: station.coffeeStatus, statusAt: station.coffeeStatusAt },
+      { code: "restaurant", label: "Restaurante", status: station.restaurantStatus, statusAt: station.restaurantStatusAt },
+      { code: "cleanliness", label: "Limpieza", status: station.cleanlinessStatus, statusAt: station.cleanlinessStatusAt },
+    ].forEach((service) => {
+      const detail = serviceStatusText(service.status, service.statusAt);
+      if (detail) notes.push({ code: service.code, label: service.label, detail: `${detail} · ${confirmationAge(service.statusAt)}` });
+    });
+    return notes;
   };
 
   const stationHighlights = (station: OfficialStation) => {
@@ -1067,30 +1083,27 @@ export default function StationExplorer({
               </div>
               <div className="official-source"><Check size={13} /> MITECO · {formatOfficialTime(station.priceObservedAt)}</div>
               <button className={`overall-score ${personalRatings[station.id]?.overall ? "user-rated" : ""}`} onClick={() => openRatingFlow(station.id)}>
-                <span className="overall-public-rating">{station.overallCount ? <><b>{Number(station.overallRating).toFixed(1)}</b><span><RatingStars value={Number(station.overallRating)} /><small>Media de la comunidad</small></span></> : <><Star size={15} fill="currentColor" /><span>Sin puntuación</span></>}</span>
-                <span className="overall-rating-detail"><small>{station.overallCount ? `${station.overallCount} ${station.overallCount === 1 ? "voto" : "votos"}` : "Sé la primera persona"}</small><em>{ratingConfidence(station.overallCount)}</em></span>
+                <span className="overall-public-rating">{station.overallCount ? <><b>{Number(station.overallRating).toFixed(1)}</b><span><RatingStars value={Number(station.overallRating)} /><small>Media de la comunidad</small></span></> : <><Star size={15} fill="currentColor" /><span>Puntuar esta parada</span></>}</span>
+                <span className="overall-rating-detail"><small>{station.overallCount ? `${station.overallCount} ${station.overallCount === 1 ? "voto" : "votos"}` : "Comparte una nota del 1 al 5"}</small>{station.overallCount ? <em>{ratingConfidence(station.overallCount)}</em> : null}</span>
                 {personalRatings[station.id]?.overall ? <strong>Tu nota {personalRatings[station.id]?.overall}/5</strong> : <strong>Puntuar</strong>}
               </button>
-              {(fuel === "lpg" || fuel === "adblue") && recentConfirmation(station.fuelCommunityStatus, station.fuelCommunityAt) ? (
-                <div className={`fuel-confirmation ${station.fuelCommunityStatus === "working" ? "positive" : "warning"}`}>
-                  {station.fuelCommunityStatus === "working" ? <ShieldCheck size={15} /> : <X size={15} />}
-                  <span><strong>{station.fuelCommunityStatus === "working" ? `${selectedFuel.label} confirmado funcionando` : station.fuelCommunityStatus === "broken" ? `Aviso: surtidor de ${selectedFuel.label} averiado` : `Aviso: sin ${selectedFuel.label}`}</strong><small>Un aviso comunitario · {confirmationAge(station.fuelCommunityAt)}{station.fuelCommunityNearby ? " · cercanía comprobada" : ""}</small></span>
+              {serviceRatingHighlights(station).length ? (
+                <div className="community-scores" aria-label="Puntuaciones de servicios">
+                  {serviceRatingHighlights(station).map((service) => <button key={service.code} onClick={() => openRatingFlow(station.id, service.code)}><span>{service.icon}{service.label}</span><strong>★ {service.rating.toFixed(1)} <small>{service.count} {service.count === 1 ? "voto" : "votos"}</small></strong></button>)}
                 </div>
               ) : null}
-              <div className="community-scores" aria-label="Valoraciones de servicios">
-                {[
-                  { code: "bathroom" as const, label: "Baños", icon: <Bath size={14} />, rating: station.bathroomRating, count: station.bathroomCount, status: station.bathroomStatus, statusAt: station.bathroomStatusAt },
-                  { code: "coffee" as const, label: "Café", icon: <Coffee size={14} />, rating: station.coffeeRating, count: station.coffeeCount, status: station.coffeeStatus, statusAt: station.coffeeStatusAt },
-                  { code: "restaurant" as const, label: "Restaurante", icon: <UtensilsCrossed size={14} />, rating: null, count: 0, status: station.restaurantStatus, statusAt: station.restaurantStatusAt },
-                  { code: "cleanliness" as const, label: "Limpieza", icon: <Sparkles size={14} />, rating: station.cleanlinessRating, count: station.cleanlinessCount, status: station.cleanlinessStatus, statusAt: station.cleanlinessStatusAt },
-                ].map((service) => <button key={service.code} onClick={() => openConfirmation(station, service.code)}><span>{service.icon}{service.label}</span><strong>{serviceStatusText(service.status, service.statusAt) || (service.count ? `${Number(service.rating).toFixed(1)} · ${service.count}` : "Confirmar")}</strong></button>)}
-              </div>
-              <button className="confirm-now" onClick={() => openConfirmation(station)}><LocateFixed size={16} /> Confirmar GLP, AdBlue o servicios <span>10 s</span></button>
               <div className="official-actions">
                 <button className="map-action" onClick={() => focusStationOnMap(station.id)}><MapPin size={16} /> Ver en mapa</button>
                 <button onClick={() => setDirectionsStation(station)}><Navigation size={16} /> Cómo llegar</button>
                 <button onClick={() => openRatingFlow(station.id)}><Star size={16} /> Puntuar</button>
               </div>
+              <details className="community-details">
+                <summary>{recentCommunityNotes(station).length ? "Información comunitaria reciente" : "Actualizar información de servicios"}</summary>
+                {recentCommunityNotes(station).length ? (
+                  <ul>{recentCommunityNotes(station).map((note) => <li key={note.code}><strong>{note.label}</strong><span>{note.detail}</span></li>)}</ul>
+                ) : null}
+                <button onClick={() => openConfirmation(station)}><ShieldCheck size={14} /> Confirmar información</button>
+              </details>
               {ratingStation === station.id ? (
                 <div className="rating-picker" aria-busy={ratingSaving}>
                   <div className="rating-flow-head"><strong>Puntúa esta parada</strong><small>Paso {ratingOptions.findIndex((option) => option.code === ratingDimension) + 1} de {ratingOptions.length}</small></div>
@@ -1136,8 +1149,6 @@ export default function StationExplorer({
           {legalNavigation.map((item) => <Link href={item.href} key={item.href}>{item.label}</Link>)}
         </nav>
       </footer>
-
-      <button className="contribute" onClick={contribute} aria-label="Confirmar datos de una estación"><ShieldCheck size={22} /> <span>Confirmar datos</span></button>
 
       <nav className="bottom-nav" aria-label="Navegación principal">
         <button className={activeNav === "map" ? "active" : ""} onClick={showMap}><MapPin size={21} /><span>Mapa</span></button>

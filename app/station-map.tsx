@@ -23,10 +23,6 @@ export type MapStation = {
   coffeeCount?: number;
   cleanlinessRating?: number | null;
   cleanlinessCount?: number;
-  bathroomStatus?: string | null;
-  coffeeStatus?: string | null;
-  restaurantStatus?: string | null;
-  cleanlinessStatus?: string | null;
 };
 
 export type VisibleMapBounds = {
@@ -273,19 +269,17 @@ export default function StationMap({ stations, selectedId, userLocation, loading
     setShowAreaSearch(false);
   };
 
-  const serviceValue = (status?: string | null, rating?: number | null, count?: number) => {
-    if (status === "clean" || status === "good" || status === "working") return "Confirmado";
-    if (status === "dirty" || status === "poor" || status === "broken" || status === "no_product") return "Aviso";
-    if (status === "closed") return "Cerrado";
-    return count ? `★ ${Number(rating).toFixed(1)}` : "Sin dato";
-  };
-
   const selectedPrices = selectedStation ? [
     { code: "gasoline_95_e5", label: "Gasolina 95", value: fuelCode === "gasoline_95_e5" ? selectedStation.priceMicros : selectedStation.gasoline95PriceMicros },
     { code: "diesel_a", label: "Diésel", value: fuelCode === "diesel_a" ? selectedStation.priceMicros : selectedStation.dieselPriceMicros },
     { code: "lpg", label: "GLP", value: fuelCode === "lpg" ? selectedStation.priceMicros : selectedStation.lpgPriceMicros },
     { code: "adblue", label: "AdBlue", value: fuelCode === "adblue" ? selectedStation.priceMicros : selectedStation.adbluePriceMicros },
   ].filter((item): item is typeof item & { value: number } => typeof item.value === "number") : [];
+  const selectedRatings = selectedStation ? [
+    { code: "bathroom", label: "Baños", rating: selectedStation.bathroomRating, count: selectedStation.bathroomCount },
+    { code: "coffee", label: "Café", rating: selectedStation.coffeeRating, count: selectedStation.coffeeCount },
+    { code: "cleanliness", label: "Limpieza", rating: selectedStation.cleanlinessRating, count: selectedStation.cleanlinessCount },
+  ].filter((item): item is typeof item & { rating: number; count: number } => typeof item.rating === "number" && Number(item.count) > 0) : [];
 
   return (
     <section className="map-explorer" id="mapa" aria-label="Mapa de gasolineras filtradas">
@@ -310,7 +304,7 @@ export default function StationMap({ stations, selectedId, userLocation, loading
           <button className="map-selection-main" onClick={() => onOpenList(selectedStation.id)}>
             <span>{selectedStation.municipality || "Estación seleccionada"}</span>
             <strong>{selectedStation.name}</strong>
-            <small>{fuelLabel} · {formatPrice(selectedStation.priceMicros)}{selectedStation.overallCount ? ` · ★ ${Number(selectedStation.overallRating).toFixed(1)} (${selectedStation.overallCount} ${selectedStation.overallCount === 1 ? "voto" : "votos"})` : " · sin nota todavía"}{personalRatings[selectedStation.id] ? ` · Tú ${personalRatings[selectedStation.id]}/5` : ""}</small>
+            <small>{fuelLabel} · {formatPrice(selectedStation.priceMicros)}{selectedStation.overallCount ? ` · ★ ${Number(selectedStation.overallRating).toFixed(1)} (${selectedStation.overallCount} ${selectedStation.overallCount === 1 ? "voto" : "votos"})` : ""}{personalRatings[selectedStation.id] ? ` · Tú ${personalRatings[selectedStation.id]}/5` : ""}</small>
           </button>
           <div className="map-selection-actions">
             <button onClick={() => onDirections(selectedStation.id)}><Navigation size={15} /> Ruta</button>
@@ -318,10 +312,7 @@ export default function StationMap({ stations, selectedId, userLocation, loading
           </div>
           <div className="map-selection-qualities">
             {selectedPrices.map((price) => <span key={price.code}><b>{price.label}</b>{formatPrice(price.value)}</span>)}
-            <span><b>Baños</b>{serviceValue(selectedStation.bathroomStatus, selectedStation.bathroomRating, selectedStation.bathroomCount)}</span>
-            <span><b>Café</b>{serviceValue(selectedStation.coffeeStatus, selectedStation.coffeeRating, selectedStation.coffeeCount)}</span>
-            <span><b>Restaurante</b>{serviceValue(selectedStation.restaurantStatus)}</span>
-            <span><b>Limpieza</b>{serviceValue(selectedStation.cleanlinessStatus, selectedStation.cleanlinessRating, selectedStation.cleanlinessCount)}</span>
+            {selectedRatings.map((service) => <span key={service.code}><b>{service.label}</b>★ {service.rating.toFixed(1)} · {service.count}</span>)}
           </div>
         </div>
       ) : null}

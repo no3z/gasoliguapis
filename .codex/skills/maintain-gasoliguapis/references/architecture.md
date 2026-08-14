@@ -27,6 +27,8 @@
 - Default fuel is Gasolina 95 and the user's selection persists between visits.
 - Map, results, selected station, distance, fuel prices, and ratings remain synchronized.
 - A station price panel shows only fuel prices actually available for that station.
+- Station panels omit unavailable facts instead of rendering `Sin datos`; service rating chips appear only when they have votes.
+- Ratings are the primary community signal. Keep temporary confirmations in a collapsed secondary disclosure, without a floating or prominent confirmation call to action.
 - Filters, location, and map fitting must remain usable on small screens.
 - No public free-text comments; they would create a moderation burden outside the current product scope.
 
