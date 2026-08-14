@@ -148,6 +148,13 @@ function ratingConfidence(count = 0) {
   return "Sin votos";
 }
 
+function RatingStars({ value }: { value: number }) {
+  const rounded = Math.max(0, Math.min(5, Math.round(value)));
+  return <span className="rating-stars-display" aria-label={`${value.toFixed(1)} de 5 estrellas`}>
+    {[1, 2, 3, 4, 5].map((star) => <Star key={star} size={11} fill={star <= rounded ? "currentColor" : "none"} />)}
+  </span>;
+}
+
 function weightedRating(average?: number | null, count = 0) {
   return average && count ? (average * count + 3.5 * 5) / (count + 5) : 0;
 }
@@ -1001,7 +1008,7 @@ export default function StationExplorer({
               </div>
               <div className="official-source"><Check size={13} /> MITECO · {formatOfficialTime(station.priceObservedAt)}</div>
               <button className={`overall-score ${personalRatings[station.id]?.overall ? "user-rated" : ""}`} onClick={() => { setRatingStation(station.id); setRatingDimension("overall"); }}>
-                <span className="overall-public-rating"><Star size={15} fill="currentColor" /> {station.overallCount ? `${Number(station.overallRating).toFixed(1)}/5` : "Sin puntuación"}</span>
+                <span className="overall-public-rating">{station.overallCount ? <><b>{Number(station.overallRating).toFixed(1)}</b><span><RatingStars value={Number(station.overallRating)} /><small>Media de la comunidad</small></span></> : <><Star size={15} fill="currentColor" /><span>Sin puntuación</span></>}</span>
                 <span className="overall-rating-detail"><small>{station.overallCount ? `${station.overallCount} ${station.overallCount === 1 ? "voto" : "votos"}` : "Sé la primera persona"}</small><em>{ratingConfidence(station.overallCount)}</em></span>
                 {personalRatings[station.id]?.overall ? <strong>Tu nota {personalRatings[station.id]?.overall}/5</strong> : <strong>Puntuar</strong>}
               </button>

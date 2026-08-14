@@ -229,6 +229,10 @@ test("connects the filtered station list to an interactive map", async () => {
   assert.match(explorer, /Valoradas por mí/);
   assert.doesNotMatch(explorer, /Abierto 24 h.*pronto|Duchas.*pronto/);
   assert.match(map, /map-marker-user-rating/);
+  assert.match(map, /map-marker-public-rating/);
+  assert.match(map, /visiblePublicRatingCount/);
+  assert.match(explorer, /Media de la comunidad/);
+  assert.match(explorer, /rating-stars-display/);
   assert.match(map, /radiusKm/);
   assert.match(css, /rating-low/);
   assert.match(css, /rating-mid/);
