@@ -32,7 +32,7 @@ export default function GuideShell({
       </article>
 
       <footer className="guide-footer">
-        <div><strong>Gasoliguapis</strong><span>Decide dónde merece la pena parar.</span><a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a></div>
+        <div><strong>Gasoliguapis</strong><span>Precios, servicios y rutas.</span><a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a></div>
         <nav aria-label="Guías útiles">
           {primaryNavigation.map((item) => <InternalLink href={item.href} key={item.href}>{item.label}</InternalLink>)}
           {legalNavigation.map((item) => <InternalLink href={item.href} key={item.href}>{item.label}</InternalLink>)}

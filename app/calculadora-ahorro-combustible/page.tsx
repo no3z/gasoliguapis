@@ -12,16 +12,11 @@ export const metadata: Metadata = {
 
 export default function SavingsPage() {
   return (
-    <GuideShell eyebrow="HERRAMIENTA GRATUITA" title="Calculadora de ahorro de combustible" lead="El precio más bajo no siempre es la parada más barata. Introduce los datos de tu viaje y descuenta el coste real del desvío.">
+    <GuideShell eyebrow="CALCULADORA" title="Ahorro de combustible" lead="Calcula el ahorro después de descontar el coste del desvío.">
       <FuelSavingsCalculator />
       <section>
-        <h2>Cómo calculamos el resultado</h2>
-        <p>Primero multiplicamos la diferencia de precio por los litros que vas a repostar. Después estimamos el combustible consumido en los kilómetros extra y restamos ese coste al ahorro del surtidor.</p>
-        <p>En la aplicación completa añadiremos también el tiempo de desvío, el tráfico y las siguientes alternativas de la ruta. El cálculo se realiza en tu dispositivo: no enviamos ni guardamos estos datos.</p>
-      </section>
-      <section className="guide-grid">
-        <div><h2>Cuándo suele compensar</h2><p>Cuantos más litros repostas y mayor es la diferencia de precio, más margen tienes para asumir un pequeño desvío.</p></div>
-        <div><h2>Cuándo no compensa</h2><p>Con depósitos pequeños, consumo alto o muchos kilómetros extra, una oferta llamativa puede acabar costando más.</p></div>
+        <h2>Cálculo</h2>
+        <p>Diferencia de precio × litros, menos el combustible consumido en el desvío. Los datos permanecen en el dispositivo.</p>
       </section>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
         "@context": "https://schema.org",

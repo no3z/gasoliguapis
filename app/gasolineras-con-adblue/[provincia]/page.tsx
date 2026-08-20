@@ -113,7 +113,7 @@ export default async function AdblueProvincePage({
         <header>
           <p>DATOS OFICIALES · {DATA_SNAPSHOT_DATE.toLocaleUpperCase("es-ES")}</p>
           <h2 id="local-adblue-heading">Precios de AdBlue en {province.name}</h2>
-          <div>Compara estaciones de todas las marcas, elige una en el mapa y abre la ruta. El precio publicado confirma que la estación comunicó AdBlue en la fecha indicada.</div>
+          <div>Precios, estaciones y rutas.</div>
         </header>
 
         <div className="local-stats" aria-label={`Resumen de precios de AdBlue en ${province.name}`}>
@@ -125,7 +125,7 @@ export default async function AdblueProvincePage({
 
         <section>
           <h3>AdBlue más barato en {province.name}</h3>
-          <p>Estas son las diez estaciones con menor precio oficial en la fotografía de datos disponible. Comprueba siempre la hora del dato y el formato de venta antes de desviarte.</p>
+          <p>Diez estaciones ordenadas por precio oficial.</p>
           <div className="local-station-list">
             {orderedStations.slice(0, 10).map((station: AdblueStation, index) => (
               <article key={station.id}>
@@ -146,7 +146,7 @@ export default async function AdblueProvincePage({
         </section>
 
         <aside className="source-note">
-          Origen de los datos: Ministerio para la Transición Ecológica y el Reto Demográfico. La comunicación del precio de AdBlue puede ser voluntaria; que una estación no aparezca no demuestra que no lo venda. <InternalLink href="/metodologia">Cómo verificamos los datos</InternalLink>.
+          Fuente: MITECO. Datos del {DATA_SNAPSHOT_DATE}. <InternalLink href="/metodologia">Criterios</InternalLink>.
         </aside>
       </section>
 

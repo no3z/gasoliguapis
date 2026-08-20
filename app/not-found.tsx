@@ -4,9 +4,9 @@ export default function NotFound() {
   return (
     <main className="not-found">
       <span>404</span>
-      <h1>Esta salida no existe</h1>
-      <p>Vuelve al buscador para encontrar una parada que sí merezca la pena.</p>
-      <InternalLink href="/">Buscar gasolineras</InternalLink>
+      <h1>Página no encontrada</h1>
+      <p>La dirección solicitada no está disponible.</p>
+      <InternalLink href="/">Ir al buscador</InternalLink>
     </main>
   );
 }

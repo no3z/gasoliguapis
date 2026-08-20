@@ -24,7 +24,7 @@ export default function LegalNoticePage() {
 
       <section>
         <h2>Exactitud y disponibilidad</h2>
-        <p>Los precios, horarios, servicios y estados pueden cambiar. Mostramos la fuente y la fecha disponible, pero la información no constituye una oferta contractual. Antes de realizar un desvío importante conviene confirmar la disponibilidad con la estación.</p>
+        <p>Los precios, horarios, servicios y estados pueden cambiar. La fuente y la fecha figuran junto a los datos, que no constituyen una oferta contractual. Antes de realizar un desvío importante conviene confirmar la disponibilidad con la estación.</p>
       </section>
 
       <section>

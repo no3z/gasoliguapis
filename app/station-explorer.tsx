@@ -767,7 +767,7 @@ export default function StationExplorer({
       setSessionUser((current) => ({ signedIn: true, displayName: current.displayName }));
       const dimensionLabel = ratingOptions.find((item) => item.code === dimension)?.label.toLowerCase() || "parada";
       const nextOption = advanceRatingFlow(dimension);
-      showToast(nextOption ? `${dimensionLabel}: ${value}/5 · ahora ${nextOption.label.toLowerCase()}` : "¡Valoración completa! Gracias por ayudar");
+      showToast(nextOption ? `${dimensionLabel}: ${value}/5 · ahora ${nextOption.label.toLowerCase()}` : "Valoración guardada");
       trackAnalyticsEvent("rate_station", { station_id: stationId, dimension, value });
     } catch {
       showToast("No se pudo guardar tu valoración");
@@ -1047,7 +1047,7 @@ export default function StationExplorer({
           <label className="result-sort"><ListFilter size={14} /><select value={selectedStationId ? "selected" : sort} onChange={(event) => { const nextSort = event.target.value as SortMode; setSelectedStationId(null); setSort(nextSort); setShowCount(20); trackAnalyticsEvent("select_sort", { sort: nextSort }); }} aria-label="Ordenar resultados">{selectedStationId ? <option value="selected">Seleccionada + cercanas</option> : null}<option value="price">Más baratas</option><option value="rating">Mejor puntuadas</option><option value="distance" disabled={!location}>Más cercanas</option></select></label>
         </div>
 
-        <p className="official-context"><ShieldCheck size={14} /> {favoritesOnly ? "Tus guardadas se conservan en este dispositivo y respetan los filtros actuales." : mineOnly ? "Mostramos únicamente las estaciones a las que ya has dado una nota general." : mapBounds ? "Estaciones dentro del rectángulo visible del mapa; mueve el mapa para buscar en otra zona." : location ? `Estaciones en un radio de ${radiusKm} km; la distancia es en línea recta.` : province ? `Resultados oficiales en ${provinceLabel}.` : "Búsqueda nacional en toda España."} Precio y disponibilidad procedentes de MITECO.</p>
+        <p className="official-context"><ShieldCheck size={14} /> {favoritesOnly ? "Tus guardadas se conservan en este dispositivo y respetan los filtros actuales." : mineOnly ? "Solo estaciones a las que ya has dado una nota general." : mapBounds ? "Estaciones dentro del rectángulo visible del mapa; mueve el mapa para buscar en otra zona." : location ? `Estaciones en un radio de ${radiusKm} km; la distancia es en línea recta.` : province ? `Resultados oficiales en ${provinceLabel}.` : "Búsqueda nacional en toda España."} Precio y disponibilidad procedentes de MITECO.</p>
         {sort === "rating" && !selectedStationId ? <p className="rating-method-note"><Star size={14} /> Ordenamos por nota y cantidad de votos. La media visible es la real; el orden compensa las estaciones con muy pocos votos.</p> : null}
 
         {officialError ? <div className="official-message error"><X size={18} /> {officialError}</div> : null}
@@ -1125,29 +1125,29 @@ export default function StationExplorer({
         {!officialLoading && showCount < filteredOfficialStations.length ? (
           <button className="load-more" onClick={() => setShowCount((current) => current + 20)}>Ver 20 estaciones más</button>
         ) : null}
-        {!officialLoading && !favoritesOnly && !mineOnly && officialTotal > officialStations.length ? <p className="result-limit">Mostramos las 100 mejores coincidencias. Usa provincia, búsqueda o cercanía para afinar.</p> : null}
+        {!officialLoading && !favoritesOnly && !mineOnly && officialTotal > officialStations.length ? <p className="result-limit">100 mejores coincidencias. Usa provincia, búsqueda o cercanía para afinar.</p> : null}
 
         <aside className="trust-strip">
           <ShieldCheck size={18} />
-          <div><strong>Precio oficial, experiencia propia</strong><span>Mostramos la fuente y la fecha; baños y cafetería solo tendrán valoraciones reales verificables.</span></div>
-          <InternalLink href="/metodologia">Cómo funciona</InternalLink>
+          <div><strong>Datos con fuente y fecha</strong><span>Precios oficiales y valoraciones reales.</span></div>
+          <InternalLink href="/metodologia">Fuentes</InternalLink>
         </aside>
       </section>
 
       <section className="seo-value" aria-labelledby="why-gasoliguapis">
-        <p className="seo-kicker">GLP Y ADBLUE SIN SORPRESAS</p>
-        <h2 id="why-gasoliguapis">Busca combustible y puntúa la parada completa</h2>
-        <p className="seo-lead">Gasoliguapis combina el catálogo oficial de MITECO con puntuaciones propias. Puedes localizar GLP o AdBlue, comparar el precio publicado y valorar por separado la estación, los baños, el café y la limpieza.</p>
+        <p className="seo-kicker">INFORMACIÓN ÚTIL</p>
+        <h2 id="why-gasoliguapis">Consulta y compara</h2>
+        <p className="seo-lead">Precios oficiales de GLP y AdBlue, rutas y valoraciones por servicio.</p>
         <div>
-          <InternalLink href="/calculadora-ahorro-combustible"><strong>Ahorro neto</strong><span>Comprueba si el precio compensa los kilómetros de desvío.</span></InternalLink>
-          <InternalLink href="/gasolineras-con-glp"><strong>GLP confirmado</strong><span>Disponibilidad y precio oficial con fecha visible.</span></InternalLink>
-          <InternalLink href="/gasolineras-con-adblue"><strong>AdBlue sin suposiciones</strong><span>Diferenciamos confirmado, comunidad y dato desconocido.</span></InternalLink>
-          <InternalLink href="/metodologia#valoraciones"><strong>Puntuaciones propias</strong><span>Notas separadas para la parada, baños, café y limpieza, siempre con número de votos.</span></InternalLink>
+          <InternalLink href="/calculadora-ahorro-combustible"><strong>Calculadora</strong><span>Ahorro neto del desvío.</span></InternalLink>
+          <InternalLink href="/gasolineras-con-glp"><strong>GLP</strong><span>Estaciones y precios.</span></InternalLink>
+          <InternalLink href="/gasolineras-con-adblue"><strong>AdBlue</strong><span>Estaciones y precios.</span></InternalLink>
+          <InternalLink href="/metodologia#valoraciones"><strong>Valoraciones</strong><span>Parada, baños, café y limpieza.</span></InternalLink>
         </div>
       </section>
 
       <footer className="app-footer">
-        <div><strong>Gasoliguapis</strong><span>Buscador de GLP y AdBlue con precios oficiales y puntuaciones.</span></div>
+        <div><strong>Gasoliguapis</strong><span>Precios, servicios y rutas.</span></div>
         <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
         <nav aria-label="Información legal">
           {legalNavigation.map((item) => <InternalLink href={item.href} key={item.href}>{item.label}</InternalLink>)}
@@ -1171,7 +1171,7 @@ export default function StationExplorer({
               <a href={`https://www.google.com/maps/dir/?api=1&destination=${directionsStation.latE6 / 1_000_000},${directionsStation.lngE6 / 1_000_000}&travelmode=driving`} target="_blank" rel="noreferrer" onClick={() => { trackAnalyticsEvent("get_directions", { provider: "google_maps", station_id: directionsStation.id }); setDirectionsStation(null); }}><span className="maps-logo google">G</span><div><strong>Google Maps</strong><small>Abrir ruta en coche</small></div><Navigation size={18} /></a>
               <a href={`https://maps.apple.com/?daddr=${directionsStation.latE6 / 1_000_000},${directionsStation.lngE6 / 1_000_000}&dirflg=d`} target="_blank" rel="noreferrer" onClick={() => { trackAnalyticsEvent("get_directions", { provider: "apple_maps", station_id: directionsStation.id }); setDirectionsStation(null); }}><span className="maps-logo apple">A</span><div><strong>Apple Maps</strong><small>Abrir ruta en coche</small></div><Navigation size={18} /></a>
             </div>
-            <small className="directions-note">La navegación se abre fuera de Gasoliguapis con las coordenadas oficiales de la estación.</small>
+            <small className="directions-note">Ruta calculada con las coordenadas de la estación.</small>
           </section>
         </div>
       ) : null}
@@ -1238,7 +1238,7 @@ export default function StationExplorer({
                 <h2>Haz mejores las paradas</h2>
                 <p>Inicia sesión para puntuar la parada, los baños, el café o la limpieza. Sin comentarios públicos.</p>
                 <a className="social google" href={signInPath} onClick={() => trackAnalyticsEvent("login_start", { method: "Google" })}><b aria-hidden="true">G</b> Continuar con Google</a>
-                <small><ShieldCheck size={14} /> Nunca publicaremos nada sin tu permiso.</small>
+                <small><ShieldCheck size={14} /> Sin publicaciones en tu cuenta de Google.</small>
               </>
             )}
           </section>

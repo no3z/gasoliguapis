@@ -3,17 +3,24 @@ import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 const templateRoot = new URL("../", import.meta.url);
+let workerImportId = 0;
 
-async function render(pathname = "/") {
+async function loadWorker() {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
-  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
-  const { default: worker } = await import(workerUrl.href);
+  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-${workerImportId++}`);
+  return (await import(workerUrl.href)).default;
+}
 
+function request(worker, pathname = "/") {
   return worker.fetch(
     new Request(`http://localhost${pathname}`, { headers: { accept: "text/html" } }),
     { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
     { waitUntil() {}, passThroughOnException() {} },
   );
+}
+
+async function render(pathname = "/") {
+  return request(await loadWorker(), pathname);
 }
 
 test("server-renders the Gasoliguapis product", async () => {
@@ -24,7 +31,7 @@ test("server-renders the Gasoliguapis product", async () => {
   const html = await response.text();
   assert.match(html, /<title>Buscador de gasolineras GLP y AdBlue con valoraciones \| Gasoliguapis<\/title>/i);
   assert.match(html, /<h1[^>]*>Buscador de gasolineras con GLP y AdBlue y valoraciones<\/h1>/i);
-  assert.match(html, /Busca combustible y puntúa la parada completa/);
+  assert.match(html, /Consulta y compara/);
   assert.match(html, /CATÁLOGO OFICIAL · MITECO/);
   assert.match(html, /Precios oficiales y puntuaciones de parada, baños, café y limpieza/);
   assert.match(html, /Tu combustible/);
@@ -62,7 +69,52 @@ test("renders useful indexable GLP and savings pages", async () => {
   assert.match(glpHtml, /Gasolineras con GLP en España/);
   assert.match(glpHtml, /application\/ld\+json/);
   assert.match(calculatorHtml, /¿Compensa salir de la ruta\?/);
-  assert.match(calculatorHtml, /El cálculo se realiza en tu dispositivo/);
+  assert.match(calculatorHtml, /Los datos permanecen en el dispositivo/);
+});
+
+test("keeps every published internal link and anchor valid", async () => {
+  const worker = await loadWorker();
+  const sourcePaths = [
+    "/",
+    "/gasolineras-con-glp",
+    "/gasolineras-con-adblue",
+    "/calculadora-ahorro-combustible",
+    "/metodologia",
+    "/aviso-legal",
+    "/privacidad",
+    "/cookies",
+  ];
+  const documents = new Map();
+
+  for (const pathname of sourcePaths) {
+    const response = await request(worker, pathname);
+    assert.equal(response.status, 200, pathname);
+    documents.set(pathname, await response.text());
+  }
+
+  const destinations = new Map();
+  for (const [sourcePath, html] of documents) {
+    for (const match of html.matchAll(/<a\b[^>]*\shref="([^"]+)"[^>]*>/gi)) {
+      const url = new URL(match[1], `http://localhost${sourcePath}`);
+      if (url.origin !== "http://localhost" || url.pathname.startsWith("/api/")) continue;
+      const destination = `${url.pathname}${url.search}`;
+      const existing = destinations.get(destination) ?? { hashes: new Set(), sources: new Set() };
+      if (url.hash) existing.hashes.add(decodeURIComponent(url.hash.slice(1)));
+      existing.sources.add(sourcePath);
+      destinations.set(destination, existing);
+    }
+  }
+
+  for (const [destination, details] of destinations) {
+    const response = await request(worker, destination);
+    assert.equal(response.status, 200, `${destination} linked from ${[...details.sources].join(", ")}`);
+    if (!details.hashes.size) continue;
+    const html = await response.text();
+    for (const hash of details.hashes) {
+      const escapedHash = hash.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      assert.match(html, new RegExp(`\\s(?:id|name)="${escapedHash}"`), `${destination}#${hash}`);
+    }
+  }
 });
 
 test("renders useful province-level GLP pages and lists them in the sitemap", async () => {
@@ -135,7 +187,7 @@ test("keeps product metadata, reliable links and removes the disposable starter"
   assert.match(layout, /og\.png/);
   assert.match(layout, /max-image-preview/);
   assert.match(stationExplorer, /Continuar con Google/);
-  assert.match(stationExplorer, /Puntuaciones propias/);
+  assert.match(stationExplorer, /<strong>Valoraciones<\/strong>/);
   assert.doesNotMatch(stationExplorer, /next\/link|<Link\b/);
   assert.doesNotMatch(guideShell, /next\/link|<Link\b/);
   assert.match(internalLink, /return <a href=\{href\}/);
