@@ -186,7 +186,7 @@ export default function StationExplorer({
   initialFuel = DEFAULT_FUEL,
   initialProvince = "",
   autoLocate = true,
-  pageHeading = "Buscador de gasolineras con GLP y AdBlue y valoraciones",
+  pageHeading = "Busca tu gasolinera",
 }: {
   signInPath: string;
   initialFuel?: FuelCode;

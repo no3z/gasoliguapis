@@ -30,7 +30,7 @@ test("server-renders the Gasoliguapis product", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>Buscador de gasolineras GLP y AdBlue con valoraciones \| Gasoliguapis<\/title>/i);
-  assert.match(html, /<h1[^>]*>Buscador de gasolineras con GLP y AdBlue y valoraciones<\/h1>/i);
+  assert.match(html, /<h1[^>]*>Busca tu gasolinera<\/h1>/i);
   assert.match(html, /Consulta y compara/);
   assert.match(html, /CATÁLOGO OFICIAL · MITECO/);
   assert.match(html, /Precios oficiales y puntuaciones de parada, baños, café y limpieza/);
