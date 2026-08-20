@@ -10,5 +10,5 @@ export const metadata: Metadata = {
 };
 
 export default function AdblueSearchPage() {
-  return <StationExplorer initialFuel="adblue" signInPath="/api/auth/google/start?return_to=%2Fbuscar%2Fadblue" />;
+  return <StationExplorer initialFuel="adblue" pageHeading="Buscador de gasolineras con AdBlue en España" signInPath="/api/auth/google/start?return_to=%2Fbuscar%2Fadblue" />;
 }

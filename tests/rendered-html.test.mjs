@@ -22,10 +22,11 @@ test("server-renders the Gasoliguapis product", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>Gasolineras en carretera: precios, GLP, AdBlue y servicios \| Gasoliguapis<\/title>/i);
-  assert.match(html, /Encuentra tu/);
+  assert.match(html, /<title>Buscador de gasolineras GLP y AdBlue con valoraciones \| Gasoliguapis<\/title>/i);
+  assert.match(html, /<h1[^>]*>Buscador de gasolineras con GLP y AdBlue y valoraciones<\/h1>/i);
+  assert.match(html, /Busca combustible y puntúa la parada completa/);
   assert.match(html, /CATÁLOGO OFICIAL · MITECO/);
-  assert.match(html, /Combustible, servicios y puntuaciones/);
+  assert.match(html, /Precios oficiales y puntuaciones de parada, baños, café y limpieza/);
   assert.match(html, /Tu combustible/);
   assert.match(html, /aria-pressed="true"[^>]*>[^<]*(?:<[^>]+>)*95/i);
   assert.doesNotMatch(html, /Tiene GLP|Tiene AdBlue|Debe tener GLP|Debe tener AdBlue/);
@@ -33,7 +34,7 @@ test("server-renders the Gasoliguapis product", async () => {
   assert.match(html, /Cerca de mí/);
   assert.match(html, /Más baratas/);
   assert.match(html, /Mejor puntuadas/);
-  assert.match(html, /MAPA NACIONAL DE PARADAS/);
+  assert.match(html, /Mapa interactivo de gasolineras filtradas/);
   assert.match(html, /Cafetería/);
   assert.match(html, /calculadora-ahorro-combustible/);
   assert.doesNotMatch(html, /FICHA DE EJEMPLO|opiniones demo|Precios de muestra/);
@@ -81,6 +82,23 @@ test("renders useful province-level GLP pages and lists them in the sitemap", as
   assert.match(sitemapXml, /gasolineras-con-glp\/barcelona/);
 });
 
+test("renders useful province-level AdBlue pages and lists them in the sitemap", async () => {
+  const [provinceResponse, sitemapResponse] = await Promise.all([
+    render("/gasolineras-con-adblue/madrid"),
+    render("/sitemap.xml"),
+  ]);
+  assert.equal(provinceResponse.status, 200);
+  assert.equal(sitemapResponse.status, 200);
+  const provinceHtml = await provinceResponse.text();
+  const sitemapXml = await sitemapResponse.text();
+  assert.match(provinceHtml, /Gasolineras con AdBlue en Madrid: mapa y precios oficiales/);
+  assert.match(provinceHtml, /Precios de AdBlue en (?:<!-- -->)?Madrid/);
+  assert.match(provinceHtml, /precio mínimo/);
+  assert.match(provinceHtml, /AdBlue más barato en (?:<!-- -->)?Madrid/);
+  assert.match(sitemapXml, /gasolineras-con-adblue\/madrid/);
+  assert.match(sitemapXml, /gasolineras-con-adblue\/barcelona/);
+});
+
 test("publishes contact, privacy and cookie information for consent-managed advertising", async () => {
   const [homeResponse, privacyResponse, cookiesResponse] = await Promise.all([
     render("/"),
@@ -99,11 +117,13 @@ test("publishes contact, privacy and cookie information for consent-managed adve
   assert.match(cookiesHtml, /etiqueta de Google AdSense/i);
 });
 
-test("keeps product metadata and removes the disposable starter", async () => {
-  const [page, layout, stationExplorer, analytics, analyticsConfig, packageJson] = await Promise.all([
+test("keeps product metadata, reliable links and removes the disposable starter", async () => {
+  const [page, layout, stationExplorer, guideShell, internalLink, analytics, analyticsConfig, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/station-explorer.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/guide-shell.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/internal-link.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/analytics.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/config/analytics/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
@@ -115,6 +135,11 @@ test("keeps product metadata and removes the disposable starter", async () => {
   assert.match(layout, /og\.png/);
   assert.match(layout, /max-image-preview/);
   assert.match(stationExplorer, /Continuar con Google/);
+  assert.match(stationExplorer, /Puntuaciones propias/);
+  assert.doesNotMatch(stationExplorer, /next\/link|<Link\b/);
+  assert.doesNotMatch(guideShell, /next\/link|<Link\b/);
+  assert.match(internalLink, /return <a href=\{href\}/);
+  assert.match(internalLink, /\{children\}<\/a>/);
   assert.match(layout, /GooglePrivacyMeasurement/);
   assert.match(analytics, /analytics_storage: "denied"/);
   assert.match(analytics, /ad_personalization: "denied"/);
@@ -126,6 +151,7 @@ test("keeps product metadata and removes the disposable starter", async () => {
   assert.match(analytics, /gasoliguapisAnalyticsConsent !== true/);
   assert.match(analyticsConfig, /GA_MEASUREMENT_ID/);
   assert.doesNotMatch(stationExplorer, /Continuar con ChatGPT|Facebook/);
+  assert.doesNotMatch(stationExplorer, /No tienes avisos nuevos|aria-label="Notificaciones"/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview/SkeletonPreview.tsx", import.meta.url)));
   await access(new URL("../public/og.png", import.meta.url));

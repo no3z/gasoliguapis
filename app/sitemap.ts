@@ -19,8 +19,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const provinceRoutes = PROVINCES
     .filter((province) => covered.has(province.official))
     .map((province) => ({ path: `/gasolineras-con-glp/${province.slug}`, priority: 0.8, frequency: "daily" as const }));
+  const adblueCovered = new Set(snapshot.products.adblue.map((station) => station.province));
+  const adblueProvinceRoutes = PROVINCES
+    .filter((province) => adblueCovered.has(province.official))
+    .map((province) => ({ path: `/gasolineras-con-adblue/${province.slug}`, priority: 0.8, frequency: "daily" as const }));
 
-  return [...routes, ...provinceRoutes].map((route) => ({
+  return [...routes, ...provinceRoutes, ...adblueProvinceRoutes].map((route) => ({
     url: `${SITE_URL}${route.path}`,
     lastModified: new Date("2026-08-10T00:00:00+02:00"),
     changeFrequency: route.frequency,

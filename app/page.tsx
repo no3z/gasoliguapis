@@ -5,9 +5,9 @@ import { SITE_URL } from "./site-config";
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
-  title: "Gasolineras en carretera: precios, GLP, AdBlue y servicios",
+  title: "Buscador de gasolineras GLP y AdBlue con valoraciones",
   description:
-    "Compara precios oficiales MITECO y encuentra gasolineras con GLP, AdBlue, baños cuidados y cafetería en las carreteras de España.",
+    "Encuentra gasolineras con GLP y AdBlue, compara precios oficiales de MITECO y consulta o añade puntuaciones de la parada, baños, café y limpieza.",
   alternates: { canonical: "/" },
 };
 
@@ -18,14 +18,34 @@ export default function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify({
           "@context": "https://schema.org",
-          "@type": "WebApplication",
-          name: "Gasoliguapis",
-          url: SITE_URL,
-          applicationCategory: "TravelApplication",
-          operatingSystem: "Web",
-          inLanguage: "es-ES",
-          description: "Buscador de gasolineras y paradas en carretera con precios oficiales, GLP, AdBlue y valoraciones de servicios.",
-          offers: { "@type": "Offer", price: "0", priceCurrency: "EUR" },
+          "@graph": [
+            {
+              "@type": "WebSite",
+              "@id": `${SITE_URL}/#website`,
+              name: "Gasoliguapis",
+              url: SITE_URL,
+              inLanguage: "es-ES",
+              description: "Buscador de gasolineras con GLP y AdBlue y puntuaciones de la comunidad.",
+            },
+            {
+              "@type": "WebApplication",
+              "@id": `${SITE_URL}/#app`,
+              name: "Gasoliguapis",
+              url: SITE_URL,
+              isPartOf: { "@id": `${SITE_URL}/#website` },
+              applicationCategory: "TravelApplication",
+              operatingSystem: "Web",
+              inLanguage: "es-ES",
+              description: "Buscador de gasolineras con precios oficiales de GLP y AdBlue y valoraciones separadas de parada, baños, café y limpieza.",
+              featureList: [
+                "Búsqueda de gasolineras con GLP",
+                "Búsqueda de gasolineras con AdBlue",
+                "Comparación de precios oficiales de MITECO",
+                "Puntuaciones de parada, baños, café y limpieza",
+              ],
+              offers: { "@type": "Offer", price: "0", priceCurrency: "EUR" },
+            },
+          ],
         }) }}
       />
       <StationExplorer

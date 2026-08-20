@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import snapshot from "../../public/data/miteco-special-fuels.json";
 import GuideShell from "../guide-shell";
+import InternalLink from "../internal-link";
 import { PROVINCES } from "../provinces";
 import { DATA_SNAPSHOT_DATE, SITE_URL } from "../site-config";
 
@@ -29,7 +29,7 @@ export default function GlpGuide() {
     .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name, "es"));
 
   return (
-    <GuideShell eyebrow="GUÍA DE AUTOGÁS" title="Gasolineras con GLP en España" lead="Consulta el precio oficial antes de salir y combina el filtro de GLP con AdBlue cuando necesites ambos productos en la misma parada.">
+    <GuideShell eyebrow="GUÍA DE AUTOGÁS" title="Gasolineras con GLP en España" lead="Consulta el precio oficial antes de salir y comprueba también si la estación publica AdBlue cuando necesites ambos productos en la misma parada.">
       <section className="guide-stats" aria-label="Cobertura de los datos">
         {facts.map(([value, label]) => <div key={label}><strong>{value}</strong><span>{label}</span></div>)}
       </section>
@@ -38,12 +38,12 @@ export default function GlpGuide() {
         <h2>Una búsqueda basada en disponibilidad confirmada</h2>
         <p>Gasoliguapis utiliza el precio comunicado al Ministerio para confirmar que una estación ofrece GLP. En la consulta realizada el {DATA_SNAPSHOT_DATE}, el conjunto oficial contenía 1.000 estaciones con precio de GLP.</p>
         <p>El precio y la fecha de observación aparecen juntos. Así puedes distinguir un dato oficial reciente de una recomendación de la comunidad y evitar listados donde no está claro cuándo se comprobó por última vez.</p>
-        <Link className="guide-cta" href="/buscar/glp#explorar">Abrir el buscador nacional de GLP</Link>
+        <InternalLink className="guide-cta" href="/buscar/glp#explorar">Abrir el buscador nacional de GLP</InternalLink>
       </section>
 
       <section className="guide-grid">
         <div><h2>Antes de desviarte</h2><p>Compara el ahorro del repostaje con los kilómetros extra. Un precio más bajo puede dejar de compensar si obliga a salir demasiado de la ruta.</p></div>
-        <div><h2>GLP y AdBlue juntos</h2><p>Activa los dos requisitos para ver únicamente estaciones con precio publicado de ambos productos. Es especialmente útil en viajes largos o vehículos mixtos.</p></div>
+        <div><h2>GLP y AdBlue juntos</h2><p>En cada resultado de GLP mostramos también el precio de AdBlue cuando la estación lo ha publicado. Así puedes reconocer paradas que ofrecen ambos productos sin confundir un dato ausente con una negativa.</p></div>
       </section>
 
       <section>
@@ -61,14 +61,14 @@ export default function GlpGuide() {
         <p>Entra en una provincia para abrir el mapa ya filtrado, comparar el precio mínimo, medio y máximo y consultar las estaciones más baratas.</p>
         <div className="province-link-grid">
           {coveredProvinces.map((province) => (
-            <Link href={`/gasolineras-con-glp/${province.slug}`} key={province.slug}>
+            <InternalLink href={`/gasolineras-con-glp/${province.slug}`} key={province.slug}>
               <span>{province.name}</span><strong>{province.count}</strong>
-            </Link>
+            </InternalLink>
           ))}
         </div>
       </section>
 
-      <aside className="source-note">Datos de precios procedentes del <a href="https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/" rel="noreferrer">servicio oficial de precios de carburantes</a>. Fecha del recuento: {DATA_SNAPSHOT_DATE}. <Link href="/metodologia">Consulta la metodología</Link>.</aside>
+      <aside className="source-note">Datos de precios procedentes del <a href="https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/" rel="noreferrer">servicio oficial de precios de carburantes</a>. Fecha del recuento: {DATA_SNAPSHOT_DATE}. <InternalLink href="/metodologia">Consulta la metodología</InternalLink>.</aside>
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
         "@context": "https://schema.org",

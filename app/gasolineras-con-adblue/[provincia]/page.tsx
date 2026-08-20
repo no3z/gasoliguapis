@@ -6,10 +6,10 @@ import { provinceBySlug, PROVINCES } from "../../provinces";
 import { DATA_SNAPSHOT_DATE, SITE_URL } from "../../site-config";
 import StationExplorer from "../../station-explorer";
 
-type GlpStation = (typeof snapshot.products.lpg)[number];
+type AdblueStation = (typeof snapshot.products.adblue)[number];
 
 function stationsInProvince(officialProvince: string) {
-  return snapshot.products.lpg.filter((station) => station.province === officialProvince);
+  return snapshot.products.adblue.filter((station) => station.province === officialProvince);
 }
 
 function formatPrice(priceMicros: number) {
@@ -20,7 +20,7 @@ function formatPrice(priceMicros: number) {
 }
 
 export function generateStaticParams() {
-  const covered = new Set(snapshot.products.lpg.map((station) => station.province));
+  const covered = new Set(snapshot.products.adblue.map((station) => station.province));
   return PROVINCES.filter((province) => covered.has(province.official))
     .map((province) => ({ provincia: province.slug }));
 }
@@ -36,18 +36,18 @@ export async function generateMetadata({
   const count = stationsInProvince(province.official).length;
 
   return {
-    title: `Gasolineras con GLP en ${province.name}: mapa y precios`,
-    description: `Encuentra ${count} gasolineras con GLP en ${province.name}, compara precios oficiales por litro y abre la ruta hasta la estación elegida.`,
-    alternates: { canonical: `/gasolineras-con-glp/${province.slug}` },
+    title: `Gasolineras con AdBlue en ${province.name}: mapa y precios`,
+    description: `Encuentra ${count} gasolineras con AdBlue en ${province.name}, compara precios oficiales y abre la ruta hasta la estación elegida.`,
+    alternates: { canonical: `/gasolineras-con-adblue/${province.slug}` },
     openGraph: {
-      title: `Gasolineras con GLP en ${province.name}`,
+      title: `Gasolineras con AdBlue en ${province.name}`,
       description: `${count} estaciones con precio oficial, mapa y rutas.`,
-      url: `/gasolineras-con-glp/${province.slug}`,
+      url: `/gasolineras-con-adblue/${province.slug}`,
     },
   };
 }
 
-export default async function GlpProvincePage({
+export default async function AdblueProvincePage({
   params,
 }: {
   params: Promise<{ provincia: string }>;
@@ -68,16 +68,16 @@ export default async function GlpProvincePage({
   }
   const municipalities = [...municipalityCounts.entries()]
     .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0], "es"));
-  const canonicalPath = `/gasolineras-con-glp/${province.slug}`;
+  const canonicalPath = `/gasolineras-con-adblue/${province.slug}`;
 
   const structuredData = {
     "@context": "https://schema.org",
     "@graph": [
       {
         "@type": "CollectionPage",
-        name: `Gasolineras con GLP en ${province.name}`,
+        name: `Gasolineras con AdBlue en ${province.name}`,
         url: `${SITE_URL}${canonicalPath}`,
-        description: `Mapa y comparación de ${stations.length} estaciones con precio oficial de GLP en ${province.name}.`,
+        description: `Mapa y comparación de ${stations.length} estaciones con precio oficial de AdBlue en ${province.name}.`,
         inLanguage: "es-ES",
         dateModified: "2026-08-10",
         isPartOf: { "@type": "WebSite", name: "Gasoliguapis", url: SITE_URL },
@@ -86,7 +86,7 @@ export default async function GlpProvincePage({
         "@type": "BreadcrumbList",
         itemListElement: [
           { "@type": "ListItem", position: 1, name: "Inicio", item: SITE_URL },
-          { "@type": "ListItem", position: 2, name: "Gasolineras con GLP", item: `${SITE_URL}/gasolineras-con-glp` },
+          { "@type": "ListItem", position: 2, name: "Gasolineras con AdBlue", item: `${SITE_URL}/gasolineras-con-adblue` },
           { "@type": "ListItem", position: 3, name: province.name, item: `${SITE_URL}${canonicalPath}` },
         ],
       },
@@ -97,26 +97,26 @@ export default async function GlpProvincePage({
     <>
       <StationExplorer
         signInPath={`/api/auth/google/start?return_to=${encodeURIComponent(canonicalPath)}`}
-        initialFuel="lpg"
+        initialFuel="adblue"
         initialProvince={province.official}
         autoLocate={false}
-        pageHeading={`Gasolineras con GLP en ${province.name}: mapa y precios oficiales`}
+        pageHeading={`Gasolineras con AdBlue en ${province.name}: mapa y precios oficiales`}
       />
 
-      <section className="local-seo" aria-labelledby="local-glp-heading">
+      <section className="local-seo" aria-labelledby="local-adblue-heading">
         <nav className="breadcrumbs" aria-label="Migas de pan">
           <InternalLink href="/">Inicio</InternalLink><span>›</span>
-          <InternalLink href="/gasolineras-con-glp">Gasolineras con GLP</InternalLink><span>›</span>
+          <InternalLink href="/gasolineras-con-adblue">Gasolineras con AdBlue</InternalLink><span>›</span>
           <span aria-current="page">{province.name}</span>
         </nav>
 
         <header>
           <p>DATOS OFICIALES · {DATA_SNAPSHOT_DATE.toLocaleUpperCase("es-ES")}</p>
-          <h2 id="local-glp-heading">Precios de GLP en {province.name}</h2>
-          <div>Compara estaciones de todas las marcas, elige una en el mapa y abre la ruta. El precio publicado confirma que la estación ofrecía GLP en la fecha indicada.</div>
+          <h2 id="local-adblue-heading">Precios de AdBlue en {province.name}</h2>
+          <div>Compara estaciones de todas las marcas, elige una en el mapa y abre la ruta. El precio publicado confirma que la estación comunicó AdBlue en la fecha indicada.</div>
         </header>
 
-        <div className="local-stats" aria-label={`Resumen de precios de GLP en ${province.name}`}>
+        <div className="local-stats" aria-label={`Resumen de precios de AdBlue en ${province.name}`}>
           <div><strong>{stations.length}</strong><span>estaciones</span></div>
           <div><strong>{formatPrice(Math.min(...prices))}</strong><span>precio mínimo</span></div>
           <div><strong>{formatPrice(averagePrice)}</strong><span>precio medio</span></div>
@@ -124,10 +124,10 @@ export default async function GlpProvincePage({
         </div>
 
         <section>
-          <h3>GLP más barato en {province.name}</h3>
-          <p>Estas son las diez estaciones con menor precio oficial en la fotografía de datos disponible. Comprueba siempre la hora del dato antes de desviarte.</p>
+          <h3>AdBlue más barato en {province.name}</h3>
+          <p>Estas son las diez estaciones con menor precio oficial en la fotografía de datos disponible. Comprueba siempre la hora del dato y el formato de venta antes de desviarte.</p>
           <div className="local-station-list">
-            {orderedStations.slice(0, 10).map((station: GlpStation, index) => (
+            {orderedStations.slice(0, 10).map((station: AdblueStation, index) => (
               <article key={station.id}>
                 <span>{index + 1}</span>
                 <div><strong>{station.name}</strong><small>{station.address} · {station.municipality}</small></div>
@@ -139,14 +139,14 @@ export default async function GlpProvincePage({
         </section>
 
         <section>
-          <h3>Municipios con GLP publicado</h3>
+          <h3>Municipios con AdBlue publicado</h3>
           <div className="municipality-list">
             {municipalities.map(([municipality, count]) => <span key={municipality}>{municipality} <b>{count}</b></span>)}
           </div>
         </section>
 
         <aside className="source-note">
-          Origen de los datos: Ministerio para la Transición Ecológica y el Reto Demográfico. La ausencia de una estación no demuestra que no venda GLP; significa que no figura con precio GLP en esta instantánea. <InternalLink href="/metodologia">Cómo verificamos los datos</InternalLink>.
+          Origen de los datos: Ministerio para la Transición Ecológica y el Reto Demográfico. La comunicación del precio de AdBlue puede ser voluntaria; que una estación no aparezca no demuestra que no lo venda. <InternalLink href="/metodologia">Cómo verificamos los datos</InternalLink>.
         </aside>
       </section>
 

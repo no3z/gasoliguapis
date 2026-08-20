@@ -12,10 +12,10 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   applicationName: SITE_NAME,
   title: {
-    default: "Gasolineras con GLP, AdBlue, baños y café | Gasoliguapis",
+    default: "Buscador de gasolineras GLP y AdBlue | Gasoliguapis",
     template: "%s | Gasoliguapis",
   },
-  description: "Compara precios oficiales y encuentra gasolineras con GLP, AdBlue, baños cuidados y buen café en las carreteras de España.",
+  description: "Encuentra gasolineras con GLP y AdBlue, compara precios oficiales y consulta puntuaciones reales de la parada y sus servicios.",
   referrer: "strict-origin-when-cross-origin",
   alternates: { canonical: "/" },
   robots: {
@@ -31,14 +31,14 @@ export const metadata: Metadata = {
     locale: "es_ES",
     url: "/",
     siteName: SITE_NAME,
-    title: "Gasoliguapis — Decide dónde merece la pena parar",
-    description: "Precios oficiales, GLP, AdBlue, baños y café en las carreteras de España.",
-    images: [{ url: "/og.png", width: 1200, height: 630, alt: "Gasoliguapis, tu mejor parada en carretera" }],
+    title: "Gasoliguapis — Buscador de gasolineras GLP y AdBlue",
+    description: "Precios oficiales y puntuaciones de gasolineras, baños, café y limpieza.",
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "Gasoliguapis, buscador de gasolineras GLP y AdBlue con puntuaciones" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Gasoliguapis — Decide dónde merece la pena parar",
-    description: "Precios oficiales, GLP, AdBlue, baños y café en carretera.",
+    title: "Gasoliguapis — Buscador de gasolineras GLP y AdBlue",
+    description: "Precios oficiales y puntuaciones de gasolineras y servicios.",
     images: ["/og.png"],
   },
 };

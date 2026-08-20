@@ -1,5 +1,5 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
+import InternalLink from "./internal-link";
 import { CONTACT_EMAIL, legalNavigation, primaryNavigation } from "./site-config";
 
 export default function GuideShell({
@@ -16,10 +16,10 @@ export default function GuideShell({
   return (
     <main className="guide-shell">
       <header className="guide-nav">
-        <Link className="guide-brand" href="/" aria-label="Gasoliguapis, volver al buscador">
+        <InternalLink className="guide-brand" href="/" aria-label="Gasoliguapis, volver al buscador">
           <span>G</span> gasoli<i>guapis</i>
-        </Link>
-        <Link className="guide-search-link" href="/">Abrir buscador</Link>
+        </InternalLink>
+        <InternalLink className="guide-search-link" href="/">Abrir buscador</InternalLink>
       </header>
 
       <article>
@@ -34,8 +34,8 @@ export default function GuideShell({
       <footer className="guide-footer">
         <div><strong>Gasoliguapis</strong><span>Decide dónde merece la pena parar.</span><a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a></div>
         <nav aria-label="Guías útiles">
-          {primaryNavigation.map((item) => <Link href={item.href} key={item.href}>{item.label}</Link>)}
-          {legalNavigation.map((item) => <Link href={item.href} key={item.href}>{item.label}</Link>)}
+          {primaryNavigation.map((item) => <InternalLink href={item.href} key={item.href}>{item.label}</InternalLink>)}
+          {legalNavigation.map((item) => <InternalLink href={item.href} key={item.href}>{item.label}</InternalLink>)}
         </nav>
       </footer>
     </main>

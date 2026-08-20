@@ -2,7 +2,6 @@
 
 import {
   Bath,
-  Bell,
   Bookmark,
   Check,
   ChevronDown,
@@ -22,9 +21,9 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { trackAnalyticsEvent } from "./analytics";
+import InternalLink from "./internal-link";
 import { displayProvince, PROVINCES } from "./provinces";
 import { CONTACT_EMAIL, legalNavigation } from "./site-config";
 import StationMap, { type VisibleMapBounds } from "./station-map";
@@ -92,6 +91,7 @@ const fuelOptions: { code: FuelCode; label: string; short: string }[] = [
   { code: "adblue", label: "AdBlue", short: "AdBlue" },
 ];
 const DEFAULT_FUEL: FuelCode = "gasoline_95_e5";
+const DEFAULT_RADIUS_KM = 75;
 const FUEL_STORAGE_KEY = "gasoliguapis:fuel";
 const radiusOptions = [10, 25, 50, 75, 100, 200] as const;
 const MAP_STATION_LIMIT = 8;
@@ -186,7 +186,7 @@ export default function StationExplorer({
   initialFuel = DEFAULT_FUEL,
   initialProvince = "",
   autoLocate = true,
-  pageHeading = "MAPA NACIONAL DE PARADAS · Encuentra tu mejor parada y las gasolineras cerca de ti",
+  pageHeading = "Buscador de gasolineras con GLP y AdBlue y valoraciones",
 }: {
   signInPath: string;
   initialFuel?: FuelCode;
@@ -200,7 +200,7 @@ export default function StationExplorer({
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [mapBounds, setMapBounds] = useState<VisibleMapBounds | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
-  const [radiusKm, setRadiusKm] = useState(75);
+  const [radiusKm, setRadiusKm] = useState(DEFAULT_RADIUS_KM);
   const [sort, setSort] = useState<SortMode>("price");
   const [fuel, setFuel] = useState<FuelCode>(initialFuel);
   const [serviceFilters, setServiceFilters] = useState<ServiceFilter[]>([]);
@@ -276,12 +276,16 @@ export default function StationExplorer({
 
   useEffect(() => {
     if (initialFuel !== DEFAULT_FUEL) return;
+    let timer: number | undefined;
     try {
       const savedFuel = window.localStorage.getItem(FUEL_STORAGE_KEY) as FuelCode | null;
-      if (savedFuel && fuelOptions.some((option) => option.code === savedFuel)) setFuel(savedFuel);
+      if (savedFuel && fuelOptions.some((option) => option.code === savedFuel)) {
+        timer = window.setTimeout(() => setFuel(savedFuel), 0);
+      }
     } catch {
       // The default remains available when local storage is unavailable.
     }
+    return () => { if (timer !== undefined) window.clearTimeout(timer); };
   }, [initialFuel]);
 
   useEffect(() => {
@@ -637,7 +641,7 @@ export default function StationExplorer({
         setSort("distance");
         setShowCount(20);
         setLocationLoading(false);
-        trackAnalyticsEvent("use_location", { method: "automatic", radius_km: radiusKm });
+        trackAnalyticsEvent("use_location", { method: "automatic", radius_km: DEFAULT_RADIUS_KM });
       },
       () => {
         setLocationLoading(false);
@@ -666,11 +670,14 @@ export default function StationExplorer({
   useEffect(() => {
     const url = new URL(window.location.href);
     if (url.searchParams.get("auth_error") !== "google") return;
-    setToast("No se pudo iniciar sesión con Google. Inténtalo de nuevo.");
     url.searchParams.delete("auth_error");
     window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
-    const timer = window.setTimeout(() => setToast(""), 3600);
-    return () => window.clearTimeout(timer);
+    const showTimer = window.setTimeout(() => setToast("No se pudo iniciar sesión con Google. Inténtalo de nuevo."), 0);
+    const hideTimer = window.setTimeout(() => setToast(""), 3600);
+    return () => {
+      window.clearTimeout(showTimer);
+      window.clearTimeout(hideTimer);
+    };
   }, []);
 
   const openLogin = async () => {
@@ -913,23 +920,18 @@ export default function StationExplorer({
   return (
     <main className="app-shell">
       <header className="topbar">
-        <Link className="brand" href="/" aria-label="Gasoliguapis, ir al inicio">
+        <InternalLink className="brand" href="/" aria-label="Gasoliguapis, ir al inicio">
           <span className="brand-mark"><Fuel size={19} strokeWidth={2.8} /></span>
           <span>gasoli<span>guapis</span></span>
-        </Link>
+        </InternalLink>
         <div className="top-actions">
-          <button className="icon-button notification" aria-label="Notificaciones" onClick={() => showToast("No tienes avisos nuevos")}>
-            <Bell size={20} />
-            <i />
-          </button>
           <button className="avatar-button" aria-label="Abrir acceso" onClick={openLogin}>
             <UserRound size={18} />
           </button>
         </div>
       </header>
 
-      <section className="map-stage advanced" aria-labelledby="map-heading">
-        <h1 className="sr-only" id="map-heading">{pageHeading}</h1>
+      <section className="map-stage advanced" aria-label="Mapa interactivo de gasolineras filtradas">
         <div className="map-canvas-shell">
           <StationMap
             stations={mapStations}
@@ -953,7 +955,7 @@ export default function StationExplorer({
 
       <section className="search-section" id="buscar" aria-labelledby="search-heading">
         <div className="search-section-head">
-          <div><span>AFINA TU PARADA</span><h2 id="search-heading">¿Dónde y qué buscas?</h2><p>Combustible, servicios y puntuaciones en un solo lugar.</p></div>
+          <div><span>GLP · ADBLUE · PUNTUACIONES</span><h1 id="search-heading">{pageHeading}</h1><p>Precios oficiales y puntuaciones de parada, baños, café y limpieza.</p></div>
           <small>{officialLoading ? "Buscando gasolineras…" : `${officialTotal.toLocaleString("es-ES")} coincidencias`}</small>
         </div>
         <div className="search-controls">
@@ -1128,25 +1130,27 @@ export default function StationExplorer({
         <aside className="trust-strip">
           <ShieldCheck size={18} />
           <div><strong>Precio oficial, experiencia propia</strong><span>Mostramos la fuente y la fecha; baños y cafetería solo tendrán valoraciones reales verificables.</span></div>
-          <Link href="/metodologia">Cómo funciona</Link>
+          <InternalLink href="/metodologia">Cómo funciona</InternalLink>
         </aside>
       </section>
 
       <section className="seo-value" aria-labelledby="why-gasoliguapis">
-        <p>PLANIFICA MEJOR LA PARADA</p>
-        <h2 id="why-gasoliguapis">No basta con encontrar gasolina barata</h2>
+        <p className="seo-kicker">GLP Y ADBLUE SIN SORPRESAS</p>
+        <h2 id="why-gasoliguapis">Busca combustible y puntúa la parada completa</h2>
+        <p className="seo-lead">Gasoliguapis combina el catálogo oficial de MITECO con puntuaciones propias. Puedes localizar GLP o AdBlue, comparar el precio publicado y valorar por separado la estación, los baños, el café y la limpieza.</p>
         <div>
-          <Link href="/calculadora-ahorro-combustible"><strong>Ahorro neto</strong><span>Comprueba si el precio compensa los kilómetros de desvío.</span></Link>
-          <Link href="/gasolineras-con-glp"><strong>GLP confirmado</strong><span>Disponibilidad y precio oficial con fecha visible.</span></Link>
-          <Link href="/gasolineras-con-adblue"><strong>AdBlue sin suposiciones</strong><span>Diferenciamos confirmado, comunidad y dato desconocido.</span></Link>
+          <InternalLink href="/calculadora-ahorro-combustible"><strong>Ahorro neto</strong><span>Comprueba si el precio compensa los kilómetros de desvío.</span></InternalLink>
+          <InternalLink href="/gasolineras-con-glp"><strong>GLP confirmado</strong><span>Disponibilidad y precio oficial con fecha visible.</span></InternalLink>
+          <InternalLink href="/gasolineras-con-adblue"><strong>AdBlue sin suposiciones</strong><span>Diferenciamos confirmado, comunidad y dato desconocido.</span></InternalLink>
+          <InternalLink href="/metodologia#valoraciones"><strong>Puntuaciones propias</strong><span>Notas separadas para la parada, baños, café y limpieza, siempre con número de votos.</span></InternalLink>
         </div>
       </section>
 
       <footer className="app-footer">
-        <div><strong>Gasoliguapis</strong><span>Mapa y precios oficiales para decidir dónde parar.</span></div>
+        <div><strong>Gasoliguapis</strong><span>Buscador de GLP y AdBlue con precios oficiales y puntuaciones.</span></div>
         <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
         <nav aria-label="Información legal">
-          {legalNavigation.map((item) => <Link href={item.href} key={item.href}>{item.label}</Link>)}
+          {legalNavigation.map((item) => <InternalLink href={item.href} key={item.href}>{item.label}</InternalLink>)}
         </nav>
       </footer>
 

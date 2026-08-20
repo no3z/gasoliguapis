@@ -8,6 +8,7 @@ export const primaryNavigation = [
   { href: "/gasolineras-con-glp", label: "Gasolineras con GLP" },
   { href: "/gasolineras-con-adblue", label: "Gasolineras con AdBlue" },
   { href: "/calculadora-ahorro-combustible", label: "Calculadora de ahorro" },
+  { href: "/metodologia#valoraciones", label: "Puntuaciones de gasolineras" },
   { href: "/metodologia", label: "Cómo verificamos" },
 ];
 

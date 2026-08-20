@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Gasoliguapis · Paradas que merecen la pena",
+    name: "Gasoliguapis · Buscador de GLP y AdBlue",
     short_name: "Gasoliguapis",
-    description: "Precios oficiales, GLP, AdBlue y servicios en carretera.",
+    description: "Buscador de gasolineras con GLP y AdBlue, precios oficiales y puntuaciones de la comunidad.",
     start_url: "/",
     display: "standalone",
     background_color: "#f7f3eb",

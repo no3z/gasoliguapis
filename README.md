@@ -9,7 +9,7 @@ Aplicación móvil para encontrar la mejor parada en carretera por sentido, desv
 - Esquema D1 de 20 tablas para catálogo, red viaria, precios, comunidad, fotos y moderación.
 - Ingesta paginada y protegida del censo/precios oficiales de MITECO, con un único snapshot por ciclo en R2 y escrituras D1 solo cuando cambia un dato.
 - Respuestas oficiales cacheables en CDN durante 30 minutos y tolerantes a caídas temporales del proveedor.
-- Filtros oficiales por Gasóleo A, Gasolina 95, GLP y AdBlue, con requisitos combinables GLP + AdBlue.
+- Filtros oficiales por Gasóleo A, Gasolina 95, GLP y AdBlue; las fichas muestran también los otros combustibles publicados por cada estación.
 - Búsqueda real en toda España, las 52 provincias o un radio de 75 km usando ubicación aproximada.
 - Consulta por nombre, municipio o dirección antes de limitar resultados, total de coincidencias y hasta 100 estaciones por búsqueda.
 - Ordenación por precio o cercanía y carga progresiva en el dispositivo.
@@ -24,7 +24,7 @@ Aplicación móvil para encontrar la mejor parada en carretera por sentido, desv
 - Votos 1–5 autenticados con la identidad disponible en Sites, sin comentarios públicos; el esquema conserva soporte multi-proveedor para Google/Facebook.
 - Google/Facebook no simulan un acceso real hasta confirmar callbacks y configurar credenciales compatibles.
 - Portada cacheable sin consulta de identidad; la sesión se comprueba únicamente al abrir el perfil o escribir.
-- SEO técnico con canónicas, robots, sitemap, manifest, datos estructurados, páginas provinciales de GLP y contenidos sobre GLP, AdBlue, metodología y ahorro neto.
+- SEO técnico con canónicas, robots, sitemap, manifest, datos estructurados, páginas provinciales de GLP y AdBlue y contenidos sobre metodología, puntuaciones y ahorro neto.
 
 ## Desarrollo
 

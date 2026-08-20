@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import snapshot from "../../public/data/miteco-special-fuels.json";
 import GuideShell from "../guide-shell";
+import InternalLink from "../internal-link";
+import { PROVINCES } from "../provinces";
 import { DATA_SNAPSHOT_DATE, SITE_URL } from "../site-config";
 
 export const metadata: Metadata = {
@@ -11,11 +13,22 @@ export const metadata: Metadata = {
 };
 
 export default function AdblueGuide() {
+  const provinceCounts = new Map<string, number>();
+  for (const station of snapshot.products.adblue) {
+    provinceCounts.set(station.province, (provinceCounts.get(station.province) ?? 0) + 1);
+  }
+  const coveredProvinces = PROVINCES
+    .map((province) => ({ ...province, count: provinceCounts.get(province.official) ?? 0 }))
+    .filter((province) => province.count > 0)
+    .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name, "es"));
+  const lpgStations = new Set(snapshot.products.lpg.map((station) => station.id));
+  const bothCount = snapshot.products.adblue.filter((station) => lpgStations.has(station.id)).length;
+
   return (
     <GuideShell eyebrow="GUÍA PARA DIÉSEL" title="Gasolineras con AdBlue sin falsas certezas" lead="Mostramos cuándo la disponibilidad está confirmada y cuándo simplemente falta información. Esa diferencia evita descartar una parada por error.">
       <section className="guide-stats" aria-label="Cobertura de los datos">
-        <div><strong>2.928</strong><span>estaciones con precio AdBlue publicado</span></div>
-        <div><strong>403</strong><span>con AdBlue y GLP publicados</span></div>
+        <div><strong>{snapshot.products.adblue.length.toLocaleString("es-ES")}</strong><span>estaciones con precio AdBlue publicado</span></div>
+        <div><strong>{bothCount.toLocaleString("es-ES")}</strong><span>con AdBlue y GLP publicados</span></div>
         <div><strong>3 estados</strong><span>oficial, comunidad o desconocido</span></div>
       </section>
 
@@ -23,7 +36,7 @@ export default function AdblueGuide() {
         <h2>“Sin dato” no significa “no disponible”</h2>
         <p>La remisión del precio de AdBlue es voluntaria. Por eso interpretamos un precio oficial como disponibilidad confirmada, pero no convertimos una casilla vacía en un “no vende AdBlue”. Puede que la estación lo ofrezca sin haber comunicado el precio.</p>
         <p>La solución es conservar tres estados: confirmado por fuente oficial, confirmado recientemente por la comunidad o el propietario, y desconocido. La interfaz no mezcla esos niveles de confianza.</p>
-        <Link className="guide-cta" href="/buscar/adblue#explorar">Abrir el buscador nacional de AdBlue</Link>
+        <InternalLink className="guide-cta" href="/buscar/adblue#explorar">Abrir el buscador nacional de AdBlue</InternalLink>
       </section>
 
       <section className="guide-grid">
@@ -41,7 +54,19 @@ export default function AdblueGuide() {
         </ol>
       </section>
 
-      <aside className="source-note">Datos procedentes del <a href="https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/" rel="noreferrer">servicio oficial de precios de carburantes</a>. Recuento del {DATA_SNAPSHOT_DATE}. <Link href="/metodologia">Consulta la metodología y sus límites</Link>.</aside>
+      <section>
+        <h2>Gasolineras con AdBlue por provincia</h2>
+        <p>Entra en una provincia para abrir el mapa ya filtrado, comparar el precio mínimo, medio y máximo y consultar las estaciones con AdBlue más baratas.</p>
+        <div className="province-link-grid">
+          {coveredProvinces.map((province) => (
+            <InternalLink href={`/gasolineras-con-adblue/${province.slug}`} key={province.slug}>
+              <span>{province.name}</span><strong>{province.count}</strong>
+            </InternalLink>
+          ))}
+        </div>
+      </section>
+
+      <aside className="source-note">Datos procedentes del <a href="https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/" rel="noreferrer">servicio oficial de precios de carburantes</a>. Recuento del {DATA_SNAPSHOT_DATE}. <InternalLink href="/metodologia">Consulta la metodología y sus límites</InternalLink>.</aside>
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
         "@context": "https://schema.org",

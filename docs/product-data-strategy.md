@@ -38,7 +38,7 @@ El MVP debería cubrir toda España con catálogo/precios básicos y enriquecer 
 
 ### GLP y AdBlue
 
-En la comprobación oficial del 10 de agosto de 2026, el feed contenía 1.000 estaciones con precio GLP declarado, 2.928 con AdBlue y 403 con ambos. Los campos exactos son `Precio Gases licuados del petróleo` y `Precio Adblue`.
+En la comprobación oficial del 10 de agosto de 2026, el feed contenía 1.000 estaciones con precio GLP declarado, 2.929 con AdBlue y 403 con ambos. Los campos exactos son `Precio Gases licuados del petróleo` y `Precio Adblue`.
 
 La declaración de AdBlue es voluntaria: precio presente significa disponibilidad oficial confirmada, pero campo vacío significa «desconocido», no «no disponible». La interfaz debe conservar ese tercer estado y permitir confirmación por negocio o comunidad.
 

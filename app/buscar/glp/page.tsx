@@ -10,5 +10,5 @@ export const metadata: Metadata = {
 };
 
 export default function GlpSearchPage() {
-  return <StationExplorer initialFuel="lpg" signInPath="/api/auth/google/start?return_to=%2Fbuscar%2Fglp" />;
+  return <StationExplorer initialFuel="lpg" pageHeading="Buscador de gasolineras con GLP en España" signInPath="/api/auth/google/start?return_to=%2Fbuscar%2Fglp" />;
 }
