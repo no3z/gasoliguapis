@@ -68,6 +68,18 @@ Orden recomendado:
 
 La métrica principal debe ser la decisión de parada cualificada: inicio de navegación y confirmación posterior. Métricas secundarias: cobertura verificada, frescura, búsqueda a navegación, reseña tras visita, repetición a 30/90 días y conversión de propietarios.
 
+## Hoja de ruta SEO
+
+La siguiente mejora prioritaria es ampliar la cobertura indexable más allá de las páginas nacionales y provinciales de GLP y AdBlue:
+
+1. Crear una ficha canónica por gasolinera, basada en su identificador estable de MITECO, con nombre, dirección, municipio, combustibles disponibles, precios y fecha de actualización, puntuaciones reales, servicios confirmados y enlaces de navegación.
+2. Añadir datos estructurados `GasStation` y `BreadcrumbList`; publicar `AggregateRating` únicamente cuando existan votos reales suficientes y visibles en la ficha.
+3. Incorporar las fichas útiles al sitemap y avisar por IndexNow solo cuando una estación se cree, cambie de forma relevante o deje de estar disponible. El valor `lastmod` debe reflejar cambios reales de cada URL.
+4. Crear después páginas por municipio únicamente donde haya cobertura suficiente para ofrecer comparaciones, precios, puntuaciones y alternativas reales. No generar páginas vacías, duplicadas o concebidas solo como puertas de entrada para buscadores.
+5. Medir en Search Console y Bing Webmaster Tools las páginas indexadas, consultas locales, impresiones, clics hacia la ficha e inicios de navegación antes de ampliar la plantilla a todo el catálogo.
+
+La implantación debe comenzar con GLP y AdBlue, donde la intención de búsqueda es más específica, y conservar la separación entre datos oficiales de MITECO y aportaciones de la comunidad.
+
 ## Decisiones pendientes
 
 1. Si el alcance incluye solo la Red de Carreteras del Estado o también autovías autonómicas.
