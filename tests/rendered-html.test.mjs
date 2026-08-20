@@ -175,8 +175,21 @@ test("publishes crawlable SEO files on the custom domain", async () => {
   assert.match(robots, /Allow: \//);
   assert.match(robots, /Sitemap: https:\/\/gasoliguapis\.es\/sitemap\.xml/);
   assert.match(sitemap, /<loc>https:\/\/gasoliguapis\.es<\/loc>/);
+  assert.match(sitemap, /<lastmod>2026-08-20T00:00:00\.000Z<\/lastmod>/);
   assert.doesNotMatch(robots, /no3s\.chatgpt\.site/);
   assert.doesNotMatch(sitemap, /no3s\.chatgpt\.site/);
+});
+
+test("notifies IndexNow after a complete official-data synchronization", async () => {
+  const [indexNow, syncRoute, keyFile] = await Promise.all([
+    readFile(new URL("../app/indexnow.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/internal/sync-miteco/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../public/40095b3e43c3dc799e202e1fd0201195.txt", import.meta.url), "utf8"),
+  ]);
+  assert.match(indexNow, /https:\/\/api\.indexnow\.org\/indexnow/);
+  assert.match(indexNow, /keyLocation: INDEXNOW_KEY_LOCATION/);
+  assert.match(syncRoute, /indexNow = await notifyIndexNow\(getIndexableUrls\(\)\)/);
+  assert.equal(keyFile.trim(), "40095b3e43c3dc799e202e1fd0201195");
 });
 
 test("publishes AdSense ownership verification without loading advertising", async () => {

@@ -1,4 +1,6 @@
 import { env } from "cloudflare:workers";
+import { notifyIndexNow } from "../../../indexnow";
+import { getIndexableUrls } from "../../../seo-routes";
 
 type Prepared = {
   bind: (...values: unknown[]) => Prepared;
@@ -163,8 +165,10 @@ export async function POST(request: Request) {
   }
 
   const nextOffset = offset + selected.length;
+  let indexNow: Awaited<ReturnType<typeof notifyIndexNow>> | null = null;
   if (nextOffset >= allStations.length) {
     await runtime.DB.prepare("UPDATE data_sources SET updated_at = ? WHERE id = 'miteco-prices'").bind(observedAt).run();
+    indexNow = await notifyIndexNow(getIndexableUrls());
   }
   return Response.json({
     sourceUpdatedAt: new Date(observedAt).toISOString(),
@@ -172,5 +176,6 @@ export async function POST(request: Request) {
     processed: selected.length,
     pricesWritten,
     nextOffset: nextOffset < allStations.length ? nextOffset : null,
+    indexNow,
   });
 }

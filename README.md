@@ -25,6 +25,7 @@ Aplicación móvil para encontrar la mejor parada en carretera por sentido, desv
 - Google/Facebook no simulan un acceso real hasta confirmar callbacks y configurar credenciales compatibles.
 - Portada cacheable sin consulta de identidad; la sesión se comprueba únicamente al abrir el perfil o escribir.
 - SEO técnico con canónicas, robots, sitemap, manifest, datos estructurados, páginas provinciales de GLP y AdBlue y contenidos sobre metodología, puntuaciones y ahorro neto.
+- Aviso automático por IndexNow al completar una sincronización oficial para acelerar el descubrimiento de cambios en Bing y buscadores participantes.
 
 ## Desarrollo
 
@@ -42,6 +43,8 @@ Las variables locales se documentan en `.env.example`. Los secretos alojados se 
 ## Datos
 
 `POST /api/internal/sync-miteco?offset=0&limit=250` descarga una vez el censo oficial, conserva el snapshot en R2 e importa un tramo. Requiere `Authorization: Bearer <INGEST_SECRET>` y debe repetirse con el `nextOffset` devuelto; los tramos siguientes reutilizan el snapshot. Los clientes leen datos normalizados desde `GET /api/stations`.
+
+Al terminar el último tramo, la sincronización envía a IndexNow las URLs canónicas del sitemap. La clave pública de verificación se sirve desde la raíz del dominio; no es una credencial privada.
 
 Para que los buscadores puedan indexar las páginas, el Site debe tener acceso público. Mientras siga protegido por inicio de sesión, Google recibirá un `401` aunque `robots.txt` y el sitemap estén preparados.
 
